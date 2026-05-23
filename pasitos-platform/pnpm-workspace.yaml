@@ -1,0 +1,9 @@
+allowBuilds:
+  '@prisma/engines': true
+  esbuild: false
+  msw: false
+  prisma: false
+  sharp: false
+  unrs-resolver: false
+minimumReleaseAgeExclude:
+  - shadcn@4.8.0

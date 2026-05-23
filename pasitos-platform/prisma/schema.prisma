@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum EducationLevel {
+  PRIMARY
+  SECONDARY
+  HIGH_SCHOOL
+  TECHNICAL
+  BACHELOR
+  MASTER
+  DOCTORATE
+  OTHER
+}
+
+enum EnrollmentResult {
+  PASSED
+  FAILED
+  PENDING
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         Role     @default(STUDENT)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  studentProfile StudentProfile?
+  auditLogs      AuditLog[]
+}
+
+model StudentProfile {
+  id             String         @id @default(cuid())
+  userId         String         @unique
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fullName       String
+  curp           String         @unique
+  birthDate      DateTime?
+  educationLevel EducationLevel @default(OTHER)
+  email          String
+  institution    String?
+  jobTitle       String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  enrollments Enrollment[]
+}
+
+model Course {
+  id           String   @id @default(cuid())
+  courseCode   String   @unique
+  name         String
+  courseType   String
+  format       String?
+  durationHours Int
+  modality     String
+  description  String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  enrollments Enrollment[]
+}
+
+model Enrollment {
+  id               String           @id @default(cuid())
+  studentProfileId String
+  studentProfile   StudentProfile   @relation(fields: [studentProfileId], references: [id], onDelete: Cascade)
+  courseId         String
+  course           Course           @relation(fields: [courseId], references: [id])
+  module           String?
+  startDate        DateTime?
+  endDate          DateTime?
+  score            Decimal?         @db.Decimal(5, 2)
+  result           EnrollmentResult @default(PENDING)
+  observations     String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  certificate Certificate?
+}
+
+model Certificate {
+  id                 String    @id @default(cuid())
+  enrollmentId       String    @unique
+  enrollment         Enrollment @relation(fields: [enrollmentId], references: [id])
+  certificateNumber  String    @unique
+  issueDate          DateTime  @default(now())
+  verificationFolio  String    @unique
+  digitalSignature   String
+  signaturePayload   String
+  pdfPath            String?
+  isRevoked          Boolean   @default(false)
+  revokedAt          DateTime?
+  revokedReason      String?
+  createdAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,14 @@
+.git
+.github
+.next
+node_modules
+__tests__
+*.test.ts
+*.test.tsx
+.env
+.env.local
+.env.development
+README.md
+ONBOARDING.md
+docker-compose.yml
+Dockerfile
