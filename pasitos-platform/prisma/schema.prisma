@@ -88,10 +88,25 @@ model Enrollment {
   score            Decimal?         @db.Decimal(5, 2)
   result           EnrollmentResult @default(PENDING)
   observations     String?
+  modality         String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
   certificate Certificate?
+  modules     EnrollmentModule[]
+}
+
+model EnrollmentModule {
+  id           String     @id @default(cuid())
+  enrollmentId String
+  enrollment   Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  moduleNumber Int
+  moduleName   String
+  competency   String
+  score        Decimal    @db.Decimal(5, 2)
+  evidence     String
+  result       String
+  createdAt    DateTime   @default(now())
 }
 
 model Certificate {

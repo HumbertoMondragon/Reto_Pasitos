@@ -5,7 +5,6 @@ import { buildCertificatePDF } from "./template";
 
 export type { CertificateTemplateData as CertificateData } from "./template";
 
-/** Generates the certificate PDF, saves it to public/certificates/, and returns the public path. */
 export async function generateCertificatePDF(
   data: import("./template").CertificateTemplateData
 ): Promise<string> {

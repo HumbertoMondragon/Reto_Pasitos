@@ -170,11 +170,11 @@ function UpdateGradeForm({ enrollmentId }: { enrollmentId: string }) {
 
 function IssueCertForm({ enrollmentId }: { enrollmentId: string }) {
   return (
-    <form action="/api/certificates" method="POST">
-      <input type="hidden" name="enrollmentId" value={enrollmentId} />
-      <button type="submit" className="text-xs bg-green-700 text-white px-2 py-1 rounded hover:bg-green-800 transition-colors">
-        Emitir cert.
-      </button>
-    </form>
+    <a
+      href={`/instructor/emit-cert/${enrollmentId}`}
+      className="inline-block text-xs bg-green-700 text-white px-2 py-1 rounded hover:bg-green-800 transition-colors"
+    >
+      Emitir cert.
+    </a>
   );
 }

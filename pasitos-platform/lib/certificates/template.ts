@@ -1,41 +1,18 @@
-/**
- * Certificate PDF template for Pasitos Education & Health A.C.
- *
- * Design tokens:
- *   DARK_BLUE  rgb(0, 0.20, 0.42)   — borders, headings, course name
- *   GOLD       rgb(0.78, 0.59, 0.07) — accent lines, info box border
- *   DARK_GRAY  rgb(0.30, 0.30, 0.30) — secondary text
- *   WHITE      rgb(1, 1, 1)
- *
- * Fonts (standard pdf-lib, no embedding required):
- *   Helvetica-Bold    — titles, student name, cert number
- *   Helvetica         — body text, labels
- *   Helvetica-Oblique — "Se hace constar que:" tagline
- *
- * Page: Letter landscape 792 × 612 pts
- */
-
-import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
+import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, Color } from "pdf-lib";
 import QRCode from "qrcode";
 import { readFile } from "fs/promises";
-import { existsSync } from "fs";
 import path from "path";
 
-// ── Design tokens ────────────────────────────────────────────────────────────
-export const COLORS = {
-  DARK_BLUE: rgb(0, 0.20, 0.42),
-  GOLD:      rgb(0.78, 0.59, 0.07),
-  DARK_GRAY: rgb(0.30, 0.30, 0.30),
-  MID_GRAY:  rgb(0.55, 0.55, 0.55),
-  LIGHT_BG:  rgb(0.96, 0.96, 0.98),
-  BLACK:     rgb(0, 0, 0),
-  WHITE:     rgb(1, 1, 1),
-};
+const PW = 1280;
+const PH = 853;
 
-export const FONTS = {
-  TITLE:   "Helvetica-Bold",
-  BODY:    "Helvetica",
-  ITALIC:  "Helvetica-Oblique",
+const C = {
+  purple_dark: rgb(107 / 255, 33 / 255, 168 / 255),  // #6B21A8
+  gray_dark:   rgb(55  / 255, 65  / 255, 81  / 255),  // #374151
+  gray_deeper: rgb(17  / 255, 24  / 255, 39  / 255),  // #111827
+  purple:      rgb(124 / 255, 58  / 255, 237 / 255),  // #7C3AED
+  green:       rgb(21  / 255, 128 / 255, 61  / 255),  // #15803D
+  gray_mid:    rgb(107 / 255, 114 / 255, 128 / 255),  // #6B7280
 };
 
 export interface CertificateTemplateData {
@@ -51,161 +28,196 @@ export interface CertificateTemplateData {
   verificationFolio: string;
   verifyUrl: string;
   digitalSignatureHash: string;
+  modality?: string;
+  observations?: string;
+  modules?: Array<{
+    moduleNumber: number;
+    moduleName: string;
+    competency: string;
+    score: number;
+    evidence: string;
+    result: string;
+  }>;
 }
 
 function fmtDate(d: Date): string {
   return d.toLocaleDateString("es-MX", { day: "2-digit", month: "long", year: "numeric" });
 }
 
-function cx(page: ReturnType<PDFDocument["addPage"]>, font: import("pdf-lib").PDFFont, text: string, size: number, y: number, color: import("pdf-lib").Color, pageWidth: number) {
-  const w = font.widthOfTextAtSize(text, size);
-  page.drawText(text, { x: (pageWidth - w) / 2, y, size, font, color });
+// Draws text converting from canvas coords (top-left origin) to pdf-lib (bottom-left origin).
+// align=center: x is the center point.
+// align=right: x is the right edge.
+// no align: x is the left edge.
+function dt(
+  page: PDFPage,
+  text: string,
+  font: PDFFont,
+  size: number,
+  canvasX: number,
+  canvasY: number,
+  color: Color,
+  align: "left" | "center" | "right" = "left",
+) {
+  const tw = font.widthOfTextAtSize(text, size);
+  let x = canvasX;
+  if (align === "center") x = canvasX - tw / 2;
+  else if (align === "right") x = canvasX - tw;
+  const y = PH - canvasY;
+  page.drawText(text, { x, y, size, font, color });
 }
 
-/** Builds the certificate PDF and returns the raw bytes. Does not write to disk. */
-export async function buildCertificatePDF(data: CertificateTemplateData): Promise<Uint8Array> {
-  const doc = await PDFDocument.create();
-  // Letter landscape: 792 × 612 pts
-  const page = doc.addPage([792, 612]);
-  const W = 792;
-  const H = 612;
+function truncate(text: string, font: PDFFont, size: number, maxW: number): string {
+  if (font.widthOfTextAtSize(text, size) <= maxW) return text;
+  let s = text;
+  while (s.length > 0 && font.widthOfTextAtSize(s + "…", size) > maxW) s = s.slice(0, -1);
+  return s + "…";
+}
 
-  const bold    = await doc.embedFont(StandardFonts.HelveticaBold);
-  const regular = await doc.embedFont(StandardFonts.Helvetica);
-  const italic  = await doc.embedFont(StandardFonts.HelveticaOblique);
-
-  // ── Background ─────────────────────────────────────────────────────────────
-  page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: COLORS.WHITE });
-
-  // ── Outer border — dark blue, 8 pts ────────────────────────────────────────
-  page.drawRectangle({
-    x: 4, y: 4, width: W - 8, height: H - 8,
-    borderColor: COLORS.DARK_BLUE, borderWidth: 8,
-    color: COLORS.WHITE,
-  });
-
-  // ── Inner border — gold, 1.5 pts ───────────────────────────────────────────
-  page.drawRectangle({
-    x: 16, y: 16, width: W - 32, height: H - 32,
-    borderColor: COLORS.GOLD, borderWidth: 1.5,
-    color: COLORS.WHITE,
-  });
-
-  // ── Header band ────────────────────────────────────────────────────────────
-  const headerH = 82;
-  page.drawRectangle({ x: 8, y: H - headerH - 8, width: W - 16, height: headerH, color: COLORS.DARK_BLUE });
-
-  // Logo — if public/logo-pasitos.png exists, embed it on the left of the header
-  const logoPath = path.join(process.cwd(), "public", "logo-pasitos.png");
-  let logoEmbedded = false;
-  if (existsSync(logoPath)) {
-    try {
-      const logoBytes = await readFile(logoPath);
-      const logoImg = await doc.embedPng(logoBytes);
-      const logoH = 56;
-      const logoW = (logoImg.width / logoImg.height) * logoH;
-      page.drawImage(logoImg, { x: 28, y: H - headerH + 8, width: logoW, height: logoH });
-      logoEmbedded = true;
-    } catch {
-      // logo load failed — fall through to text-only header
+function wrapText(text: string, font: PDFFont, size: number, maxW: number): string[] {
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let line = "";
+  for (const word of words) {
+    const test = line ? `${line} ${word}` : word;
+    if (font.widthOfTextAtSize(test, size) <= maxW) {
+      line = test;
+    } else {
+      if (line) lines.push(line);
+      line = word;
     }
   }
+  if (line) lines.push(line);
+  return lines;
+}
 
-  // Organization name — centered, or offset right if logo present
-  const orgText = "PASITOS EDUCATION & HEALTH A.C.";
-  const orgSize = 17;
-  const orgW = bold.widthOfTextAtSize(orgText, orgSize);
-  const orgX = logoEmbedded ? (W - orgW) / 2 + 20 : (W - orgW) / 2;
-  page.drawText(orgText, { x: orgX, y: H - 54, size: orgSize, font: bold, color: COLORS.WHITE });
+async function makeQr(doc: PDFDocument, url: string) {
+  const buf = await QRCode.toBuffer(url, { type: "png", width: 120, margin: 1 });
+  return doc.embedPng(buf);
+}
 
-  const tagLine = "Capacitación y Certificación Profesional";
-  const tagW = regular.widthOfTextAtSize(tagLine, 9.5);
-  const tagX = logoEmbedded ? (W - tagW) / 2 + 20 : (W - tagW) / 2;
-  page.drawText(tagLine, { x: tagX, y: H - 70, size: 9.5, font: regular, color: COLORS.GOLD });
+async function buildPage1(
+  doc: PDFDocument,
+  data: CertificateTemplateData,
+  bold: PDFFont,
+  regular: PDFFont,
+): Promise<void> {
+  const imgBytes = await readFile(path.join(process.cwd(), "public", "templates", "h1.png"));
+  const bg = await doc.embedPng(imgBytes);
+  const page = doc.addPage([PW, PH]);
+  page.drawImage(bg, { x: 0, y: 0, width: PW, height: PH });
 
-  // ── Main title ─────────────────────────────────────────────────────────────
-  const titleY = H - 126;
-  cx(page, bold, "CONSTANCIA DE CAPACITACIÓN", 22, titleY, COLORS.DARK_BLUE, W);
+  // No. certificado: x=1145, y=95, size=22, bold, #6B21A8, center
+  dt(page, data.certificateNumber, bold, 22, 1145, 95, C.purple_dark, "center");
 
-  // Gold rule under title
-  page.drawLine({ start: { x: 100, y: titleY - 8 }, end: { x: W - 100, y: titleY - 8 }, thickness: 1.2, color: COLORS.GOLD });
+  // Fecha emisión: x=1090, y=145, size=14, #374151
+  dt(page, fmtDate(data.issueDate), regular, 14, 1090, 145, C.gray_dark);
 
-  // ── Body copy ──────────────────────────────────────────────────────────────
-  cx(page, italic, "Se hace constar que:", 11, H - 162, COLORS.DARK_GRAY, W);
+  // Nombre alumno: x=640, y=340, size=52, bold, #111827, center
+  dt(page, data.studentName.toUpperCase(), bold, 52, 640, 340, C.gray_deeper, "center");
 
-  // Student name
-  cx(page, bold, data.studentName.toUpperCase(), 20, H - 192, COLORS.DARK_BLUE, W);
-  page.drawLine({ start: { x: 130, y: H - 199 }, end: { x: W - 130, y: H - 199 }, thickness: 0.8, color: COLORS.GOLD });
+  // CURP: x=640, y=390, size=16, #374151, center
+  dt(page, data.curp, regular, 16, 640, 390, C.gray_dark, "center");
 
-  // CURP
-  cx(page, regular, `CURP: ${data.curp}`, 9.5, H - 214, COLORS.MID_GRAY, W);
+  // Nombre curso: x=640, y=490, size=46, bold, #7C3AED, center, MAYÚSCULAS
+  dt(page, data.courseName.toUpperCase(), bold, 46, 640, 490, C.purple, "center");
 
-  cx(page, regular, "Ha completado satisfactoriamente el curso de:", 10.5, H - 240, COLORS.BLACK, W);
+  // Folio: x=1105, y=690, size=22, bold, #7C3AED, center
+  dt(page, data.verificationFolio, bold, 22, 1105, 690, C.purple, "center");
 
-  // Course name
-  cx(page, bold, data.courseName, 15, H - 262, COLORS.DARK_BLUE, W);
-
-  // Course details
-  const details = `${data.courseHours} horas  ·  Del ${fmtDate(data.startDate)} al ${fmtDate(data.endDate)}  ·  Calificación: ${data.score.toFixed(1)}`;
-  cx(page, regular, details, 9.5, H - 284, COLORS.DARK_GRAY, W);
-
-  // ── Thin separator above bottom section ────────────────────────────────────
-  page.drawLine({ start: { x: 26, y: 148 }, end: { x: W - 26, y: 148 }, thickness: 0.5, color: COLORS.GOLD });
-
-  // ── Bottom section — 3 columns ─────────────────────────────────────────────
-  const bottomY = 128;
-
-  // Left — signature block
-  page.drawLine({ start: { x: 48, y: bottomY }, end: { x: 216, y: bottomY }, thickness: 0.8, color: COLORS.BLACK });
-  const dirLabel = "Directora General";
-  const dirW = regular.widthOfTextAtSize(dirLabel, 9.5);
-  page.drawText(dirLabel, { x: 48 + (168 - dirW) / 2, y: bottomY - 14, size: 9.5, font: bold, color: COLORS.BLACK });
-  const orgSig = "Pasitos Education & Health A.C.";
-  const orgSigW = regular.widthOfTextAtSize(orgSig, 8.5);
-  page.drawText(orgSig, { x: 48 + (168 - orgSigW) / 2, y: bottomY - 27, size: 8.5, font: regular, color: COLORS.DARK_GRAY });
-
-  // Center — QR code
+  // QR 80×80: canvas top-left (1065, 715) → pdf bottom-left y = PH - 715 - 80
   try {
-    const qrBuf = await QRCode.toBuffer(data.verifyUrl, {
-      type: "png",
-      width: 140,
-      margin: 1,
-      color: { dark: "#001433", light: "#ffffff" },
-    });
-    const qrImg = await doc.embedPng(qrBuf);
-    const qrSz = 86;
-    const qrX = (W - qrSz) / 2;
-    const qrY = bottomY - qrSz + 6;
-    page.drawImage(qrImg, { x: qrX, y: qrY, width: qrSz, height: qrSz });
-    const qrLabel = "Escanea para verificar";
-    const qrLabelW = regular.widthOfTextAtSize(qrLabel, 7.5);
-    page.drawText(qrLabel, { x: (W - qrLabelW) / 2, y: qrY - 12, size: 7.5, font: regular, color: COLORS.MID_GRAY });
-  } catch {
-    // QR failure is non-fatal
+    const qrImg = await makeQr(doc, data.verifyUrl);
+    page.drawImage(qrImg, { x: 1065, y: PH - 715 - 80, width: 80, height: 80 });
+  } catch { /* non-fatal */ }
+}
+
+async function buildPage2(
+  doc: PDFDocument,
+  data: CertificateTemplateData,
+  bold: PDFFont,
+  regular: PDFFont,
+): Promise<void> {
+  const imgBytes = await readFile(path.join(process.cwd(), "public", "templates", "h2.png"));
+  const bg = await doc.embedPng(imgBytes);
+  const page = doc.addPage([PW, PH]);
+  page.drawImage(bg, { x: 0, y: 0, width: PW, height: PH });
+
+  const period = `${fmtDate(data.startDate)} – ${fmtDate(data.endDate)}`;
+
+  // No. certificado: x=1190, y=52, size=18, bold, #6B21A8, right
+  dt(page, data.certificateNumber, bold, 18, 1190, 52, C.purple_dark, "right");
+
+  // Fecha emisión: x=1090, y=107, size=13, #374151
+  dt(page, fmtDate(data.issueDate), regular, 13, 1090, 107, C.gray_dark);
+
+  // Nombre: x=340, y=183, size=15, bold, #111827
+  dt(page, data.studentName, bold, 15, 340, 183, C.gray_deeper);
+
+  // CURP: x=601, y=183, size=15, #374151
+  dt(page, data.curp, regular, 15, 601, 183, C.gray_dark);
+
+  // Programa: x=887, y=183, size=15, #374151
+  dt(page, truncate(data.courseName, regular, 15, 360), regular, 15, 887, 183, C.gray_dark);
+
+  // Período: x=340, y=248, size=14, #374151
+  dt(page, period, regular, 14, 340, 248, C.gray_dark);
+
+  // Duración: x=626, y=248, size=14, #374151
+  dt(page, `${data.courseHours} horas`, regular, 14, 626, 248, C.gray_dark);
+
+  // Modalidad: x=887, y=248, size=14, #374151
+  if (data.modality) {
+    dt(page, data.modality, regular, 14, 887, 248, C.gray_dark);
   }
 
-  // Right — info box
-  const infoX = W - 232;
-  const infoW = 202;
-  page.drawRectangle({ x: infoX, y: bottomY - 86, width: infoW, height: 86, color: COLORS.LIGHT_BG, borderColor: COLORS.GOLD, borderWidth: 1 });
-  const infoLines = [
-    { label: "No. Certificado:", value: data.certificateNumber },
-    { label: "Folio verificación:", value: data.verificationFolio },
-    { label: "Fecha de emisión:", value: fmtDate(data.issueDate) },
-  ];
-  infoLines.forEach(({ label, value }, i) => {
-    const lineY = bottomY - 18 - i * 24;
-    page.drawText(label, { x: infoX + 10, y: lineY, size: 8, font: bold, color: COLORS.DARK_BLUE });
-    page.drawText(value, { x: infoX + 10, y: lineY - 11, size: 8.5, font: regular, color: COLORS.BLACK });
-  });
+  // Tabla de módulos — y base=370, incremento=45
+  const modules = data.modules ?? [];
+  for (let i = 0; i < Math.min(modules.length, 5); i++) {
+    const m = modules[i];
+    const rowY = 370 + i * 45;
 
-  // ── Footer ─────────────────────────────────────────────────────────────────
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "https://pasitos.org";
-  const footerText = `Verifica la autenticidad de este documento en: ${baseUrl}/verify`;
-  cx(page, regular, footerText, 7.5, 36, COLORS.DARK_GRAY, W);
+    dt(page, truncate(m.moduleName, regular, 12, 180), regular, 12, 120, rowY, C.gray_dark);
+    dt(page, truncate(m.competency, regular, 12, 340), regular, 12, 385, rowY, C.gray_dark);
+    dt(page, Number(m.score).toFixed(1), bold, 16, 807, rowY, C.purple, "center");
+    dt(page, m.evidence, regular, 12, 965, rowY, C.gray_dark, "center");
+    const resColor = m.result === "Acreditado" ? C.green : C.gray_dark;
+    dt(page, m.result, regular, 12, 1135, rowY, resColor, "center");
+  }
 
-  const hashText = `Firma digital SHA-256: ${data.digitalSignatureHash.slice(0, 32)}…`;
-  cx(page, regular, hashText, 6.5, 25, COLORS.MID_GRAY, W);
+  // Calificación final: x=113, y=748, size=32, bold, #7C3AED, center
+  dt(page, Number(data.score).toFixed(1), bold, 32, 113, 748, C.purple, "center");
+
+  // "/10": x=155, y=748, size=18, #6B7280
+  dt(page, "/10", regular, 18, 155, 748, C.gray_mid);
+
+  // "ACREDITADO": x=113, y=790, size=13, bold, #15803D, center
+  dt(page, "ACREDITADO", bold, 13, 113, 790, C.green, "center");
+
+  // Observaciones con wrap: x=435, y=755, size=11, #374151, maxWidth=320
+  if (data.observations) {
+    const lines = wrapText(data.observations, regular, 11, 320);
+    lines.slice(0, 3).forEach((line, i) => {
+      dt(page, line, regular, 11, 435, 755 + i * 14, C.gray_dark);
+    });
+  }
+
+  // Folio: x=990, y=800, size=14, bold, #7C3AED
+  dt(page, data.verificationFolio, bold, 14, 990, 800, C.purple);
+
+  // QR 80×80: canvas top-left (1170, 748) → pdf y = PH - 748 - 80
+  try {
+    const qrImg = await makeQr(doc, data.verifyUrl);
+    page.drawImage(qrImg, { x: 1170, y: PH - 748 - 80, width: 80, height: 80 });
+  } catch { /* non-fatal */ }
+}
+
+export async function buildCertificatePDF(data: CertificateTemplateData): Promise<Uint8Array> {
+  const doc = await PDFDocument.create();
+  const bold    = await doc.embedFont(StandardFonts.HelveticaBold);
+  const regular = await doc.embedFont(StandardFonts.Helvetica);
+
+  await buildPage1(doc, data, bold, regular);
+  await buildPage2(doc, data, bold, regular);
 
   return doc.save();
 }

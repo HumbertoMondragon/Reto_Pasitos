@@ -69,7 +69,7 @@ export default async function StudentDetailPage({ params }: Props) {
           </p>
           <div className="flex flex-wrap gap-2">
             {passedWithoutCert.map((e) => (
-              <IssueCertButton key={e.id} enrollmentId={e.id} courseName={e.course.name} />
+              <IssueCertButton key={e.id} enrollmentId={e.id} courseName={e.course.name} studentId={params.id} />
             ))}
           </div>
         </div>
@@ -155,17 +155,14 @@ function Field({ label, value, mono = false }: { label: string; value: string; m
   );
 }
 
-function IssueCertButton({ enrollmentId, courseName }: { enrollmentId: string; courseName: string }) {
+function IssueCertButton({ enrollmentId, courseName, studentId }: { enrollmentId: string; courseName: string; studentId: string }) {
   return (
-    <form action="/api/certificates" method="POST">
-      <input type="hidden" name="enrollmentId" value={enrollmentId} />
-      <button
-        type="submit"
-        className="text-xs bg-green-700 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 transition-colors"
-      >
-        Emitir cert. — {courseName}
-      </button>
-    </form>
+    <a
+      href={`/admin/students/${studentId}/emit-cert/${enrollmentId}`}
+      className="inline-block text-xs bg-green-700 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 transition-colors"
+    >
+      Emitir cert. — {courseName}
+    </a>
   );
 }
 

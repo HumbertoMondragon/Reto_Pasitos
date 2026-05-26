@@ -13,6 +13,7 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
       studentProfile: true,
       course: true,
       certificate: true,
+      modules: { orderBy: { moduleNumber: "asc" } },
     },
   });
 
@@ -69,6 +70,16 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
       verificationFolio,
       verifyUrl,
       digitalSignatureHash: digitalSignature,
+      modality: enrollment.modality ?? undefined,
+      observations: enrollment.observations ?? undefined,
+      modules: enrollment.modules.map((m) => ({
+        moduleNumber: m.moduleNumber,
+        moduleName: m.moduleName,
+        competency: m.competency,
+        score: Number(m.score),
+        evidence: m.evidence,
+        result: m.result,
+      })),
     });
 
     await prisma.certificate.update({ where: { id: certificate.id }, data: { pdfPath } });
