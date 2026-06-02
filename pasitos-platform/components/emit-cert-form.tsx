@@ -40,6 +40,7 @@ export default function EmitCertForm({ enrollmentId, studentName, courseName, ba
   const [modules, setModules]         = useState<ModuleRow[]>([emptyModule()]);
   const [loading, setLoading]         = useState(false);
   const [error, setError]             = useState("");
+  const [issued, setIssued]           = useState<{ certificateNumber: string; verificationFolio: string; pdfPath: string | null } | null>(null);
 
   function updateModule(i: number, field: keyof ModuleRow, value: string) {
     setModules((prev) => prev.map((m, idx) => idx === i ? { ...m, [field]: value } : m));
@@ -87,12 +88,72 @@ export default function EmitCertForm({ enrollmentId, studentName, courseName, ba
         setLoading(false);
         return;
       }
-      router.push(backHref);
-      router.refresh();
+      setIssued({
+        certificateNumber: data.certificateNumber,
+        verificationFolio: data.verificationFolio,
+        pdfPath: data.pdfPath ?? null,
+      });
     } catch {
       setError("Error de red al emitir certificado");
       setLoading(false);
     }
+  }
+
+  if (issued) {
+    return (
+      <div className="card-pasitos p-8 max-w-lg mx-auto space-y-6 text-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="bg-green-100 rounded-full p-4">
+            <svg className="w-10 h-10 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-xl font-semibold text-[#111827]">Certificado emitido</h2>
+          <p className="text-sm text-[#6B7280]">El certificado fue generado y firmado correctamente.</p>
+        </div>
+
+        <div className="bg-[#F9F7FF] rounded-xl border border-[#E9D5FF] p-5 text-left space-y-2">
+          <div className="flex justify-between text-sm">
+            <span className="text-[#6B7280] font-medium">Alumno</span>
+            <span className="text-[#111827] font-semibold">{studentName}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#6B7280] font-medium">Curso</span>
+            <span className="text-[#111827]">{courseName}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#6B7280] font-medium">No. Certificado</span>
+            <span className="font-mono text-[#7C3AED] text-xs">{issued.certificateNumber}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#6B7280] font-medium">Folio</span>
+            <span className="font-mono text-[#7C3AED] text-xs">{issued.verificationFolio}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {issued.pdfPath && (
+            <a
+              href={issued.pdfPath}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn-primary w-full justify-center flex gap-2"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+              </svg>
+              Descargar PDF
+            </a>
+          )}
+          <a href={`/verify/${issued.verificationFolio}`} target="_blank" rel="noopener noreferrer" className="btn-secondary w-full justify-center flex text-center">
+            Verificar certificado
+          </a>
+          <a href={backHref} className="text-sm text-[#6B7280] hover:text-[#7C3AED] text-center">
+            ← Volver a la lista
+          </a>
+        </div>
+      </div>
+    );
   }
 
   return (

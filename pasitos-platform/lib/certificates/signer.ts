@@ -18,12 +18,26 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
   });
 
   if (!enrollment) throw new Error("Inscripción no encontrada");
-  if (enrollment.result !== EnrollmentResult.PASSED) {
-    throw new Error("El alumno no ha aprobado el curso — no se puede emitir certificado");
-  }
-  if (enrollment.certificate) {
-    throw new Error("Ya existe un certificado para esta inscripción");
-  }
+  if (enrollment.certificate) throw new Error("Ya existe un certificado para esta inscripción");
+
+  // Derive score and result from modules if they exist; otherwise fall back to enrollment values
+  const hasModules = enrollment.modules.length > 0;
+
+  const calculatedScore = hasModules
+    ? enrollment.modules.reduce((sum, m) => sum + Number(m.score), 0) / enrollment.modules.length
+    : Number(enrollment.score ?? 0);
+
+  const calculatedResult = hasModules
+    ? enrollment.modules.every((m) => m.result === "Acreditado")
+      ? EnrollmentResult.PASSED
+      : EnrollmentResult.FAILED
+    : enrollment.result;
+
+  // Persist derived values back to enrollment
+  await prisma.enrollment.update({
+    where: { id: enrollmentId },
+    data: { score: calculatedScore, result: calculatedResult },
+  });
 
   const certificateNumber = await generateCertificateNumber();
   const verificationFolio = generateVerificationFolio();
@@ -36,7 +50,7 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
     studentName: enrollment.studentProfile.fullName,
     curp,
     courseName: enrollment.course.name,
-    score: enrollment.score?.toString() ?? "N/A",
+    score: calculatedScore.toFixed(1),
     issueDate: issueDate.toISOString(),
     organizationId: "PASITOS-AC",
   };
@@ -64,7 +78,7 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
       courseHours: enrollment.course.durationHours,
       startDate: enrollment.startDate ?? issueDate,
       endDate: enrollment.endDate ?? issueDate,
-      score: Number(enrollment.score ?? 0),
+      score: calculatedScore,
       certificateNumber,
       issueDate,
       verificationFolio,
@@ -112,7 +126,7 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
     action: "CERT_ISSUED",
     entity: "Certificate",
     entityId: certificate.id,
-    details: { certificateNumber, verificationFolio, enrollmentId },
+    details: { certificateNumber, verificationFolio, enrollmentId, score: calculatedScore, result: calculatedResult },
   });
 
   return { ...certificate, signaturePayload };

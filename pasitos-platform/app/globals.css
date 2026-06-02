@@ -2,33 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer utilities {
-  .text-balance {
-    text-wrap: balance;
-  }
-}
-
 @layer base {
   :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
+    --pasitos-purple:       #7C3AED;
+    --pasitos-purple-dark:  #6B21A8;
+    --pasitos-purple-light: #EDE9FE;
+    --pasitos-purple-mid:   #A855F7;
+    --pasitos-gray-light:   #F9F7FF;
+    --pasitos-border:       #E9D5FF;
+    --pasitos-green:        #15803D;
+    --pasitos-dark:         #111827;
+    --pasitos-gray:         #6B7280;
+
+    /* shadcn compat */
+    --background: #F9F7FF;
+    --foreground: #111827;
+    --card: #ffffff;
+    --card-foreground: #111827;
+    --border: #E9D5FF;
+    --input: #E9D5FF;
+    --ring: #7C3AED;
     --radius: 0.625rem;
+    --primary: #7C3AED;
+    --primary-foreground: #ffffff;
+    --secondary: #EDE9FE;
+    --secondary-foreground: #6B21A8;
+    --muted: #F5F3FF;
+    --muted-foreground: #6B7280;
+    --accent: #EDE9FE;
+    --accent-foreground: #6B21A8;
+    --destructive: #DC2626;
   }
 
   * {
@@ -36,12 +39,90 @@
     outline-color: color-mix(in oklch, var(--ring) 50%, transparent);
   }
 
+  html {
+    font-family: var(--font-sans), system-ui, sans-serif;
+  }
+
   body {
     background-color: var(--background);
     color: var(--foreground);
+    line-height: 1.6;
   }
 
-  html {
-    font-family: system-ui, sans-serif;
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    color: #111827;
   }
+}
+
+@layer components {
+  /* ── Botones ─────────────────────────────────── */
+  .btn-primary {
+    @apply bg-[#7C3AED] text-white rounded-lg px-5 py-2.5 text-sm font-medium
+           hover:bg-[#6B21A8] transition-all duration-150
+           shadow-[0_2px_8px_rgba(124,58,237,0.30)]
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply border border-[#7C3AED] text-[#7C3AED] bg-transparent rounded-lg px-5 py-2.5
+           text-sm font-medium hover:bg-[#EDE9FE] transition-all duration-150
+           disabled:opacity-50;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white rounded-lg px-5 py-2.5 text-sm font-medium
+           hover:bg-red-700 transition-all duration-150;
+  }
+
+  /* ── Inputs ──────────────────────────────────── */
+  .input-pasitos {
+    @apply w-full border border-[#E9D5FF] rounded-lg px-3 py-2 text-sm
+           text-[#111827] placeholder-gray-400 bg-white
+           focus:outline-none focus:border-[#7C3AED]
+           focus:ring-[3px] focus:ring-[rgba(124,58,237,0.15)]
+           transition-all duration-150;
+  }
+
+  .label-pasitos {
+    @apply block text-sm font-medium text-[#374151] mb-1;
+  }
+
+  /* ── Tarjetas ────────────────────────────────── */
+  .card-pasitos {
+    @apply bg-white border border-[#E9D5FF] rounded-xl
+           shadow-[0_1px_3px_rgba(124,58,237,0.08)]
+           hover:shadow-[0_4px_12px_rgba(124,58,237,0.15)]
+           hover:border-[#A855F7] transition-all duration-150;
+  }
+
+  /* ── Tabla ───────────────────────────────────── */
+  .table-pasitos thead th {
+    @apply bg-[#F5F3FF] text-[#6B21A8] text-[11px] font-semibold uppercase tracking-wide
+           px-4 py-3 text-left;
+  }
+
+  .table-pasitos tbody tr {
+    @apply border-b border-[#E9D5FF] hover:bg-[#F5F3FF] transition-colors;
+  }
+
+  .table-pasitos tbody tr:nth-child(even) {
+    @apply bg-[#FAFAFF];
+  }
+
+  .table-pasitos tbody td {
+    @apply px-4 py-3 text-sm;
+  }
+
+  /* ── Badges ──────────────────────────────────── */
+  .badge-active    { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800; }
+  .badge-pending   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800; }
+  .badge-revoked   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-900; }
+  .badge-admin     { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-[#EDE9FE] text-[#6B21A8]; }
+  .badge-instructor{ @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800; }
+  .badge-student   { @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-800; }
+}
+
+@layer utilities {
+  .text-balance { text-wrap: balance; }
 }

@@ -1,9 +1,8 @@
 import { prisma } from "@/lib/db";
 import { decryptField } from "@/lib/crypto";
-import { Badge } from "@/components/ui/badge";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Download, ExternalLink, Mail } from "lucide-react";
+import { ArrowLeft, Download, ExternalLink } from "lucide-react";
 
 interface Props {
   params: { id: string };
@@ -29,14 +28,12 @@ export default async function StudentDetailPage({ params }: Props) {
   let curp = "No disponible";
   try { curp = decryptField(profile.curp); } catch {}
 
-  const passedWithoutCert = profile.enrollments.filter(
-    (e) => e.result === "PASSED" && !e.certificate
-  );
+  const enrollmentsWithoutCert = profile.enrollments.filter((e) => !e.certificate);
 
-  const resultColor: Record<string, string> = {
-    PASSED: "bg-green-100 text-green-800",
-    FAILED: "bg-red-100 text-red-800",
-    PENDING: "bg-yellow-100 text-yellow-800",
+  const resultLabel: Record<string, { label: string; cls: string }> = {
+    PASSED:  { label: "Aprobado",  cls: "badge-active" },
+    FAILED:  { label: "Reprobado", cls: "badge-revoked" },
+    PENDING: { label: "Pendiente", cls: "badge-pending" },
   };
 
   return (
@@ -62,13 +59,13 @@ export default async function StudentDetailPage({ params }: Props) {
       </div>
 
       {/* Quick actions */}
-      {passedWithoutCert.length > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
-          <p className="text-sm font-medium text-green-800 mb-3">
-            {passedWithoutCert.length} inscripción(es) aprobada(s) sin certificado:
+      {enrollmentsWithoutCert.length > 0 && (
+        <div className="bg-[#F9F7FF] border border-[#E9D5FF] rounded-xl p-4">
+          <p className="text-sm font-medium text-[#6B21A8] mb-3">
+            {enrollmentsWithoutCert.length} inscripción(es) pendiente(s) de certificado:
           </p>
           <div className="flex flex-wrap gap-2">
-            {passedWithoutCert.map((e) => (
+            {enrollmentsWithoutCert.map((e) => (
               <IssueCertButton key={e.id} enrollmentId={e.id} courseName={e.course.name} studentId={params.id} />
             ))}
           </div>
@@ -101,18 +98,18 @@ export default async function StudentDetailPage({ params }: Props) {
                   <td className="px-4 py-3 text-gray-600">{e.module ?? "—"}</td>
                   <td className="px-4 py-3 text-gray-700">{e.score != null ? Number(e.score).toFixed(1) : "—"}</td>
                   <td className="px-4 py-3">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${resultColor[e.result] ?? ""}`}>
-                      {e.result}
-                    </span>
+                    {(() => { const r = resultLabel[e.result] ?? { label: e.result, cls: "badge-pending" }; return <span className={r.cls}>{r.label}</span>; })()}
                   </td>
                   <td className="px-4 py-3">
                     {e.certificate ? (
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs text-gray-600">{e.certificate.certificateNumber}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-xs text-[#7C3AED]">{e.certificate.certificateNumber}</span>
                         {e.certificate.pdfPath && (
                           <a
-                            href={`/api/certificates/${e.certificate.id}?download=pdf`}
-                            className="text-blue-600 hover:text-blue-800"
+                            href={e.certificate.pdfPath}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#7C3AED] hover:text-[#6B21A8]"
                             title="Descargar PDF"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -122,12 +119,11 @@ export default async function StudentDetailPage({ params }: Props) {
                           href={`/verify/${e.certificate.verificationFolio}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-gray-400 hover:text-gray-600"
+                          className="text-[#9CA3AF] hover:text-[#6B7280]"
                           title="Verificar"
                         >
                           <ExternalLink className="w-3.5 h-3.5" />
                         </a>
-                        <ResendEmailButton certId={e.certificate.id} />
                       </div>
                     ) : (
                       <span className="text-gray-400 text-xs">Sin certificado</span>
@@ -159,23 +155,10 @@ function IssueCertButton({ enrollmentId, courseName, studentId }: { enrollmentId
   return (
     <a
       href={`/admin/students/${studentId}/emit-cert/${enrollmentId}`}
-      className="inline-block text-xs bg-green-700 text-white px-3 py-1.5 rounded-lg hover:bg-green-800 transition-colors"
+      className="inline-block text-xs bg-[#7C3AED] text-white px-3 py-1.5 rounded-lg hover:bg-[#6B21A8] transition-colors"
     >
       Emitir cert. — {courseName}
     </a>
   );
 }
 
-function ResendEmailButton({ certId }: { certId: string }) {
-  return (
-    <form action={`/api/certificates/${certId}/resend`} method="POST">
-      <button
-        type="submit"
-        className="text-blue-500 hover:text-blue-700 transition-colors"
-        title="Reenviar certificado por email"
-      >
-        <Mail className="w-3.5 h-3.5" />
-      </button>
-    </form>
-  );
-}

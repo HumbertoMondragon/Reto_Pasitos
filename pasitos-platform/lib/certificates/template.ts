@@ -106,28 +106,28 @@ async function buildPage1(
   const page = doc.addPage([PW, PH]);
   page.drawImage(bg, { x: 0, y: 0, width: PW, height: PH });
 
-  // No. certificado: x=1145, y=95, size=22, bold, #6B21A8, center
-  dt(page, data.certificateNumber, bold, 22, 1145, 95, C.purple_dark, "center");
+  // No. certificado: x=1148, y=97, size=17, bold, #6B21A8, center, boxW=140
+  dt(page, data.certificateNumber, bold, 17, 1148, 97, C.purple_dark, "center");
 
-  // Fecha emisión: x=1090, y=145, size=14, #374151
-  dt(page, fmtDate(data.issueDate), regular, 14, 1090, 145, C.gray_dark);
+  // Fecha emisión: x=1148, y=163, size=14, #374151, center — debajo del ícono de calendario
+  dt(page, fmtDate(data.issueDate), regular, 14, 1168, 163, C.gray_dark, "center");
 
   // Nombre alumno: x=640, y=340, size=52, bold, #111827, center
   dt(page, data.studentName.toUpperCase(), bold, 52, 640, 340, C.gray_deeper, "center");
 
-  // CURP: x=640, y=390, size=16, #374151, center
-  dt(page, data.curp, regular, 16, 640, 390, C.gray_dark, "center");
+  // CURP: solo valor (etiqueta ya impresa en plantilla), x=640, y=392, size=15, center
+  dt(page, data.curp, regular, 15, 656, 378, C.gray_dark, "center");
 
   // Nombre curso: x=640, y=490, size=46, bold, #7C3AED, center, MAYÚSCULAS
   dt(page, data.courseName.toUpperCase(), bold, 46, 640, 490, C.purple, "center");
 
-  // Folio: x=1105, y=690, size=22, bold, #7C3AED, center
-  dt(page, data.verificationFolio, bold, 22, 1105, 690, C.purple, "center");
+  // Folio: x=1105, y=695, size=15, bold, #7C3AED, center
+  dt(page, data.verificationFolio, bold, 15, 1105, 695, C.purple, "center");
 
-  // QR 80×80: canvas top-left (1065, 715) → pdf bottom-left y = PH - 715 - 80
+  // QR 72×72: canvas top-left (1063, 705) → pdf bottom-left y = PH - 705 - 72
   try {
     const qrImg = await makeQr(doc, data.verifyUrl);
-    page.drawImage(qrImg, { x: 1065, y: PH - 715 - 80, width: 80, height: 80 });
+    page.drawImage(qrImg, { x: 1063, y: PH - 455 - 72, width: 72, height: 72 });
   } catch { /* non-fatal */ }
 }
 
@@ -147,27 +147,27 @@ async function buildPage2(
   // No. certificado: x=1190, y=52, size=18, bold, #6B21A8, right
   dt(page, data.certificateNumber, bold, 18, 1190, 52, C.purple_dark, "right");
 
-  // Fecha emisión: x=1090, y=107, size=13, #374151
-  dt(page, fmtDate(data.issueDate), regular, 13, 1090, 107, C.gray_dark);
+  // Fecha emisión: x=1148, y=128, size=12, #374151, center — debajo del ícono de calendario
+  dt(page, fmtDate(data.issueDate), regular, 12, 1148, 128, C.gray_dark, "center");
 
-  // Nombre: x=340, y=183, size=15, bold, #111827
-  dt(page, data.studentName, bold, 15, 340, 183, C.gray_deeper);
+  // Nombre: x=268, y=188, size=14, bold, #111827, maxWidth=290
+  dt(page, truncate(data.studentName, bold, 14, 290), bold, 14, 268, 188, C.gray_deeper);
 
-  // CURP: x=601, y=183, size=15, #374151
-  dt(page, data.curp, regular, 15, 601, 183, C.gray_dark);
+  // CURP: x=580, y=183, size=14, #374151, maxWidth=240
+  dt(page, truncate(data.curp, regular, 14, 240), regular, 14, 580, 183, C.gray_dark);
 
-  // Programa: x=887, y=183, size=15, #374151
-  dt(page, truncate(data.courseName, regular, 15, 360), regular, 15, 887, 183, C.gray_dark);
+  // Programa: x=860, y=191, size=15, #374151
+  dt(page, truncate(data.courseName, regular, 15, 360), regular, 15, 860, 191, C.gray_dark);
 
-  // Período: x=340, y=248, size=14, #374151
-  dt(page, period, regular, 14, 340, 248, C.gray_dark);
+  // Período: x=268, y=253, size=11, #374151
+  dt(page, period, regular, 11, 268, 253, C.gray_dark);
 
-  // Duración: x=626, y=248, size=14, #374151
-  dt(page, `${data.courseHours} horas`, regular, 14, 626, 248, C.gray_dark);
+  // Duración: x=556, y=253, size=14, #374151
+  dt(page, `${data.courseHours} horas`, regular, 14, 588, 253, C.gray_dark);
 
-  // Modalidad: x=887, y=248, size=14, #374151
+  // Modalidad: x=860, y=256, size=14, #374151
   if (data.modality) {
-    dt(page, data.modality, regular, 14, 887, 248, C.gray_dark);
+    dt(page, data.modality, regular, 14, 860, 256, C.gray_dark);
   }
 
   // Tabla de módulos — y base=370, incremento=45
@@ -184,30 +184,31 @@ async function buildPage2(
     dt(page, m.result, regular, 12, 1135, rowY, resColor, "center");
   }
 
-  // Calificación final: x=113, y=748, size=32, bold, #7C3AED, center
-  dt(page, Number(data.score).toFixed(1), bold, 32, 113, 748, C.purple, "center");
+  // ── Footer ────────────────────────────────────────────────────────────────
+  // Calificación final
+  dt(page, Number(data.score).toFixed(1), bold, 40, 200, 672, C.purple, "center");
 
-  // "/10": x=155, y=748, size=18, #6B7280
-  dt(page, "/10", regular, 18, 155, 748, C.gray_mid);
+  // "/10"
+  dt(page, "/10", regular, 24, 242, 672, C.gray_mid);
 
-  // "ACREDITADO": x=113, y=790, size=13, bold, #15803D, center
-  dt(page, "ACREDITADO", bold, 13, 113, 790, C.green, "center");
+  // "ACREDITADO"
+  dt(page, "ACREDITADO", bold, 16, 200, 694, C.green, "center");
 
-  // Observaciones con wrap: x=435, y=755, size=11, #374151, maxWidth=320
+  // Observaciones con wrap
   if (data.observations) {
-    const lines = wrapText(data.observations, regular, 11, 320);
+    const lines = wrapText(data.observations, regular, 14, 320);
     lines.slice(0, 3).forEach((line, i) => {
-      dt(page, line, regular, 11, 435, 755 + i * 14, C.gray_dark);
+      dt(page, line, regular, 14, 412, 664 + i * 17, C.gray_dark);
     });
   }
 
-  // Folio: x=990, y=800, size=14, bold, #7C3AED
-  dt(page, data.verificationFolio, bold, 14, 990, 800, C.purple);
+  // Folio
+  dt(page, data.verificationFolio, bold, 14, 914, 700, C.purple);
 
-  // QR 80×80: canvas top-left (1170, 748) → pdf y = PH - 748 - 80
+  // QR 76×76
   try {
     const qrImg = await makeQr(doc, data.verifyUrl);
-    page.drawImage(qrImg, { x: 1170, y: PH - 748 - 80, width: 80, height: 80 });
+    page.drawImage(qrImg, { x: 1092, y: PH - 644 - 76, width: 76, height: 76 });
   } catch { /* non-fatal */ }
 }
 

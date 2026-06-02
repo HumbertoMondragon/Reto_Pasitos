@@ -1,129 +1,214 @@
-import { prisma } from "@/lib/db";
+"use client";
 
-export default async function InstructorEnrollPage() {
-  const courses = await prisma.course.findMany({
-    where: { isActive: true },
-    orderBy: { courseCode: "asc" },
-  });
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 
-  const educationLevels = [
-    { value: "PRIMARY", label: "Primaria" },
-    { value: "SECONDARY", label: "Secundaria" },
-    { value: "HIGH_SCHOOL", label: "Preparatoria / Bachillerato" },
-    { value: "TECHNICAL", label: "Técnico" },
-    { value: "BACHELOR", label: "Licenciatura" },
-    { value: "MASTER", label: "Maestría" },
-    { value: "DOCTORATE", label: "Doctorado" },
-    { value: "OTHER", label: "Otro" },
-  ];
+const educationLevels = [
+  { value: "PRIMARY",     label: "Primaria" },
+  { value: "SECONDARY",   label: "Secundaria" },
+  { value: "HIGH_SCHOOL", label: "Preparatoria / Bachillerato" },
+  { value: "TECHNICAL",   label: "Técnico" },
+  { value: "BACHELOR",    label: "Licenciatura" },
+  { value: "MASTER",      label: "Maestría" },
+  { value: "DOCTORATE",   label: "Doctorado" },
+  { value: "OTHER",       label: "Otro" },
+];
+
+interface Course { id: string; courseCode: string; name: string; durationHours: number }
+
+const inp = "input-pasitos";
+const lbl = "label-pasitos";
+
+export default function InstructorEnrollPage() {
+  const router = useRouter();
+  const [courses, setCourses]   = useState<Course[]>([]);
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState("");
+  const [success, setSuccess]   = useState("");
+
+  // Student fields
+  const [fullName, setFullName]           = useState("");
+  const [curp, setCurp]                   = useState("");
+  const [birthDate, setBirthDate]         = useState("");
+  const [educationLevel, setEduLevel]     = useState("OTHER");
+  const [email, setEmail]                 = useState("");
+  const [institution, setInstitution]     = useState("");
+  const [jobTitle, setJobTitle]           = useState("");
+
+  // Enrollment fields
+  const [courseId, setCourseId]           = useState("");
+  const [module, setModule]               = useState("Módulo Único");
+  const [startDate, setStartDate]         = useState("");
+  const [endDate, setEndDate]             = useState("");
+  const [observations, setObservations]   = useState("");
+
+  useEffect(() => {
+    fetch("/api/courses")
+      .then((r) => r.json())
+      .then((d) => setCourses(d.courses ?? d ?? []))
+      .catch(() => {});
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+    setLoading(true);
+
+    try {
+      // 1 — Crear alumno
+      const studentRes = await fetch("/api/students", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fullName: fullName.trim(),
+          curp: curp.trim().toUpperCase(),
+          birthDate: birthDate || undefined,
+          educationLevel,
+          email: email.trim(),
+          institution: institution.trim() || undefined,
+          jobTitle: jobTitle.trim() || undefined,
+        }),
+      });
+
+      const studentData = await studentRes.json();
+      if (!studentRes.ok) {
+        setError(studentData.error ?? "Error al registrar al alumno");
+        setLoading(false);
+        return;
+      }
+
+      const studentProfileId = studentData.id;
+
+      // 2 — Crear inscripción si hay curso seleccionado
+      if (courseId) {
+        const enrollRes = await fetch("/api/enrollments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            studentProfileId,
+            courseId,
+            module: module.trim() || "Módulo Único",
+            startDate: startDate || undefined,
+            endDate: endDate || undefined,
+            observations: observations.trim() || undefined,
+          }),
+        });
+
+        if (!enrollRes.ok) {
+          const enrollData = await enrollRes.json();
+          // El alumno ya fue creado — avisar pero no fallar completamente
+          setError(`Alumno registrado pero error en inscripción: ${enrollData.error ?? "Error desconocido"}`);
+          setLoading(false);
+          return;
+        }
+      }
+
+      setSuccess("Alumno registrado exitosamente.");
+      setTimeout(() => router.push("/instructor/students"), 1200);
+    } catch {
+      setError("Error de red. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Registrar Alumno</h1>
-        <p className="text-sm text-gray-500 mt-1">Llena los datos del participante e inscríbelo a un curso.</p>
+        <h1 className="text-2xl font-semibold text-[#111827]">Registrar Alumno</h1>
+        <p className="text-sm text-[#6B7280] mt-1">Llena los datos del participante e inscríbelo a un curso.</p>
       </div>
 
-      <form action="/api/students" method="POST" className="bg-white rounded-xl border p-6 space-y-5">
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-1 border-b">Datos Personales</h2>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {/* Datos personales */}
+        <div className="card-pasitos p-6 space-y-4">
+          <h2 className="text-xs font-semibold text-[#6B21A8] uppercase tracking-wide pb-1 border-b border-[#E9D5FF]">
+            Datos Personales
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <Label>Nombre Completo *</Label>
-              <input name="fullName" required className={inputCls} placeholder="Nombre completo del participante" />
+              <label className={lbl}>Nombre Completo *</label>
+              <input value={fullName} onChange={(e) => setFullName(e.target.value)} required className={inp} placeholder="Nombre completo del participante" />
             </div>
             <div>
-              <Label>CURP *</Label>
-              <input name="curp" required maxLength={18} minLength={18} className={`${inputCls} uppercase font-mono`} placeholder="18 caracteres" />
+              <label className={lbl}>CURP *</label>
+              <input value={curp} onChange={(e) => setCurp(e.target.value.toUpperCase())} required maxLength={18} minLength={18} className={`${inp} uppercase font-mono`} placeholder="18 caracteres" />
             </div>
             <div>
-              <Label>Fecha de Nacimiento</Label>
-              <input name="birthDate" type="date" className={inputCls} />
+              <label className={lbl}>Fecha de Nacimiento</label>
+              <input value={birthDate} onChange={(e) => setBirthDate(e.target.value)} type="date" className={inp} />
             </div>
             <div>
-              <Label>Último Grado de Estudio</Label>
-              <select name="educationLevel" className={inputCls}>
-                {educationLevels.map((l) => (
-                  <option key={l.value} value={l.value}>{l.label}</option>
-                ))}
+              <label className={lbl}>Último Grado de Estudio</label>
+              <select value={educationLevel} onChange={(e) => setEduLevel(e.target.value)} className={inp}>
+                {educationLevels.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
               </select>
             </div>
             <div>
-              <Label>Correo Electrónico *</Label>
-              <input name="email" type="email" required className={inputCls} placeholder="correo@ejemplo.com" />
+              <label className={lbl}>Correo Electrónico *</label>
+              <input value={email} onChange={(e) => setEmail(e.target.value)} type="email" required className={inp} placeholder="correo@ejemplo.com" />
             </div>
             <div>
-              <Label>Institución / Guardería</Label>
-              <input name="institution" className={inputCls} placeholder="Nombre de la institución" />
+              <label className={lbl}>Institución / Guardería</label>
+              <input value={institution} onChange={(e) => setInstitution(e.target.value)} className={inp} placeholder="Nombre de la institución" />
             </div>
             <div>
-              <Label>Cargo o Puesto</Label>
-              <input name="jobTitle" className={inputCls} placeholder="Ej. Educadora, Puericulturista" />
+              <label className={lbl}>Cargo o Puesto</label>
+              <input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} className={inp} placeholder="Ej. Educadora, Puericulturista" />
             </div>
           </div>
-        </section>
+        </div>
 
-        <section>
-          <h2 className="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3 pb-1 border-b">Inscripción al Curso</h2>
+        {/* Inscripción */}
+        <div className="card-pasitos p-6 space-y-4">
+          <h2 className="text-xs font-semibold text-[#6B21A8] uppercase tracking-wide pb-1 border-b border-[#E9D5FF]">
+            Inscripción al Curso <span className="normal-case text-[#6B7280] font-normal">(opcional)</span>
+          </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="sm:col-span-2">
-              <Label>Curso *</Label>
-              <select name="courseId" required className={inputCls}>
+              <label className={lbl}>Curso</label>
+              <select value={courseId} onChange={(e) => setCourseId(e.target.value)} className={inp}>
                 <option value="">— Selecciona un curso —</option>
                 {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.courseCode} — {c.name} ({c.durationHours} hrs)
-                  </option>
+                  <option key={c.id} value={c.id}>{c.courseCode} — {c.name} ({c.durationHours} hrs)</option>
                 ))}
               </select>
             </div>
             <div>
-              <Label>Módulo</Label>
-              <input name="module" className={inputCls} placeholder="Ej. Módulo Único" />
+              <label className={lbl}>Módulo</label>
+              <input value={module} onChange={(e) => setModule(e.target.value)} className={inp} placeholder="Ej. Módulo Único" />
             </div>
             <div />
             <div>
-              <Label>Fecha de Inicio</Label>
-              <input name="startDate" type="date" className={inputCls} />
+              <label className={lbl}>Fecha de Inicio</label>
+              <input value={startDate} onChange={(e) => setStartDate(e.target.value)} type="date" className={inp} />
             </div>
             <div>
-              <Label>Fecha de Término</Label>
-              <input name="endDate" type="date" className={inputCls} />
-            </div>
-            <div>
-              <Label>Calificación (0–10)</Label>
-              <input name="score" type="number" min="0" max="10" step="0.1" className={inputCls} placeholder="Ej. 9.0" />
-            </div>
-            <div>
-              <Label>Resultado</Label>
-              <select name="result" className={inputCls}>
-                <option value="PENDING">Pendiente</option>
-                <option value="PASSED">Aprobado</option>
-                <option value="FAILED">Reprobado</option>
-              </select>
+              <label className={lbl}>Fecha de Término</label>
+              <input value={endDate} onChange={(e) => setEndDate(e.target.value)} type="date" className={inp} />
             </div>
             <div className="sm:col-span-2">
-              <Label>Observaciones</Label>
-              <textarea name="observations" rows={2} className={inputCls} placeholder="Observaciones opcionales..." />
+              <label className={lbl}>Observaciones</label>
+              <textarea value={observations} onChange={(e) => setObservations(e.target.value)} rows={2} className={inp} placeholder="Observaciones opcionales..." />
             </div>
           </div>
-        </section>
+        </div>
 
-        <div className="flex justify-end gap-3 pt-2">
-          <a href="/instructor/students" className="px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 transition-colors">
-            Cancelar
-          </a>
-          <button type="submit" className="px-6 py-2 bg-blue-800 text-white rounded-lg text-sm font-medium hover:bg-blue-900 transition-colors">
-            Registrar Alumno
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">{error}</div>
+        )}
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">{success}</div>
+        )}
+
+        <div className="flex justify-end gap-3">
+          <a href="/instructor/students" className="btn-secondary">Cancelar</a>
+          <button type="submit" disabled={loading} className="btn-primary">
+            {loading ? "Registrando..." : "Registrar Alumno"}
           </button>
         </div>
       </form>
     </div>
   );
 }
-
-function Label({ children }: { children: React.ReactNode }) {
-  return <label className="block text-xs font-medium text-gray-600 mb-1">{children}</label>;
-}
-
-const inputCls = "w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent";

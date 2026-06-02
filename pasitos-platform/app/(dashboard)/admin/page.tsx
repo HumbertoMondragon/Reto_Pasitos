@@ -1,6 +1,4 @@
 import { prisma } from "@/lib/db";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Users, Award, BookOpen, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
@@ -17,136 +15,148 @@ async function getStats() {
       prisma.enrollment.findMany({
         take: 5,
         orderBy: { createdAt: "desc" },
-        include: { studentProfile: { select: { fullName: true } }, course: { select: { name: true, courseCode: true } } },
+        include: {
+          studentProfile: { select: { fullName: true } },
+          course: { select: { name: true, courseCode: true } },
+        },
       }),
       prisma.certificate.findMany({
         take: 5,
         orderBy: { issueDate: "desc" },
         where: { isRevoked: false },
-        include: { enrollment: { include: { studentProfile: { select: { fullName: true } }, course: { select: { name: true } } } } },
+        include: {
+          enrollment: {
+            include: {
+              studentProfile: { select: { fullName: true } },
+              course: { select: { name: true } },
+            },
+          },
+        },
       }),
     ]);
 
   return { totalStudents, totalCerts, activeCourses, certsThisMonth, recentEnrollments, recentCerts };
 }
 
+const resultLabel: Record<string, { label: string; cls: string }> = {
+  PASSED:  { label: "Aprobado",  cls: "badge-active" },
+  FAILED:  { label: "Reprobado", cls: "badge-revoked" },
+  PENDING: { label: "Pendiente", cls: "badge-pending" },
+};
+
 export default async function AdminDashboard() {
   const stats = await getStats();
 
   const statCards = [
-    { title: "Total Estudiantes", value: stats.totalStudents, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-    { title: "Certificados Emitidos", value: stats.totalCerts, icon: Award, color: "text-green-600", bg: "bg-green-50" },
-    { title: "Cursos Activos", value: stats.activeCourses, icon: BookOpen, color: "text-purple-600", bg: "bg-purple-50" },
-    { title: "Certificados Este Mes", value: stats.certsThisMonth, icon: TrendingUp, color: "text-orange-600", bg: "bg-orange-50" },
+    { title: "Total Estudiantes",      value: stats.totalStudents,   icon: Users,      },
+    { title: "Certificados Emitidos",  value: stats.totalCerts,      icon: Award,      },
+    { title: "Cursos Activos",         value: stats.activeCourses,   icon: BookOpen,   },
+    { title: "Certificados Este Mes",  value: stats.certsThisMonth,  icon: TrendingUp, },
   ];
-
-  const resultColors: Record<string, string> = {
-    PASSED: "default",
-    FAILED: "destructive",
-    PENDING: "secondary",
-  };
 
   return (
     <div className="space-y-6">
+      {/* Page header */}
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Panel de administración — Pasitos Education &amp; Health A.C.</p>
+        <h1 className="text-2xl font-semibold text-[#111827]">Dashboard</h1>
+        <p className="text-sm text-[#6B7280] mt-0.5">
+          Panel de administración — Pasitos Education &amp; Health A.C.
+        </p>
       </div>
 
-      {/* Stats */}
+      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-        {statCards.map((s) => (
-          <Card key={s.title}>
-            <CardContent className="p-5 flex items-center gap-4">
-              <div className={`${s.bg} rounded-xl p-3`}>
-                <s.icon className={`w-6 h-6 ${s.color}`} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{s.value}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{s.title}</p>
-              </div>
-            </CardContent>
-          </Card>
+        {statCards.map(({ title, value, icon: Icon }) => (
+          <div key={title} className="card-pasitos p-5 flex items-center gap-4">
+            <div className="bg-[#EDE9FE] rounded-xl p-3 shrink-0">
+              <Icon className="w-5 h-5 text-[#7C3AED]" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-[#111827]">{value}</p>
+              <p className="text-xs text-[#6B7280] mt-0.5">{title}</p>
+            </div>
+          </div>
         ))}
       </div>
 
       {/* Quick actions */}
       <div className="flex flex-wrap gap-3">
-        <Link href="/admin/students/new" className="bg-blue-800 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-900 transition-colors">
+        <Link href="/admin/students/new" className="btn-primary">
           + Registrar Estudiante
         </Link>
-        <Link href="/admin/certificates" className="bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-800 transition-colors">
-          Emitir Certificado
+        <Link href="/admin/certificates" className="btn-secondary">
+          Ver Certificados
         </Link>
-        <Link href="/admin/audit" className="bg-gray-700 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors">
+        <Link href="/admin/audit" className="btn-secondary">
           Ver Auditoría
         </Link>
       </div>
 
+      {/* Recent tables */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent enrollments */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Últimas Inscripciones</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-500 border-b">
-                  <th className="pb-2 text-left font-medium">Estudiante</th>
-                  <th className="pb-2 text-left font-medium">Curso</th>
-                  <th className="pb-2 text-left font-medium">Estado</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {stats.recentEnrollments.map((e) => (
-                  <tr key={e.id} className="hover:bg-gray-50">
-                    <td className="py-2 font-medium text-gray-800">{e.studentProfile.fullName}</td>
-                    <td className="py-2 text-gray-600">{e.course.courseCode}</td>
-                    <td className="py-2">
-                      <Badge variant={resultColors[e.result] as "default" | "destructive" | "secondary"}>
-                        {e.result}
-                      </Badge>
-                    </td>
+        {/* Últimas inscripciones */}
+        <div className="card-pasitos overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E9D5FF]">
+            <h2 className="text-sm font-semibold text-[#111827]">Últimas Inscripciones</h2>
+          </div>
+          <table className="w-full table-pasitos">
+            <thead>
+              <tr>
+                <th>Estudiante</th>
+                <th>Curso</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.recentEnrollments.map((e) => {
+                const res = resultLabel[e.result] ?? { label: e.result, cls: "badge-pending" };
+                return (
+                  <tr key={e.id}>
+                    <td className="font-medium text-[#111827]">{e.studentProfile.fullName}</td>
+                    <td className="text-[#6B7280]">{e.course.courseCode}</td>
+                    <td><span className={res.cls}>{res.label}</span></td>
                   </tr>
-                ))}
-                {stats.recentEnrollments.length === 0 && (
-                  <tr><td colSpan={3} className="py-4 text-center text-gray-400 text-xs">Sin inscripciones aún</td></tr>
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+                );
+              })}
+              {stats.recentEnrollments.length === 0 && (
+                <tr><td colSpan={3} className="text-center text-[#6B7280] text-xs py-6">Sin inscripciones aún</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-        {/* Recent certificates */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Últimos Certificados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-xs text-gray-500 border-b">
-                  <th className="pb-2 text-left font-medium">Estudiante</th>
-                  <th className="pb-2 text-left font-medium">No. Cert.</th>
-                  <th className="pb-2 text-left font-medium">Fecha</th>
+        {/* Últimos certificados */}
+        <div className="card-pasitos overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#E9D5FF] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[#111827]">Últimos Certificados</h2>
+            <Link href="/admin/certificates" className="text-xs text-[#7C3AED] hover:text-[#6B21A8] font-medium">
+              Ver todos →
+            </Link>
+          </div>
+          <table className="w-full table-pasitos">
+            <thead>
+              <tr>
+                <th>Estudiante</th>
+                <th>No. Certificado</th>
+                <th>Fecha</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.recentCerts.map((c) => (
+                <tr key={c.id}>
+                  <td className="font-medium text-[#111827]">{c.enrollment.studentProfile.fullName}</td>
+                  <td className="font-mono text-xs text-[#7C3AED]">{c.certificateNumber}</td>
+                  <td className="text-[#6B7280] text-xs">
+                    {new Date(c.issueDate).toLocaleDateString("es-MX")}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y">
-                {stats.recentCerts.map((c) => (
-                  <tr key={c.id} className="hover:bg-gray-50">
-                    <td className="py-2 font-medium text-gray-800">{c.enrollment.studentProfile.fullName}</td>
-                    <td className="py-2 font-mono text-xs text-gray-600">{c.certificateNumber}</td>
-                    <td className="py-2 text-gray-500 text-xs">{new Date(c.issueDate).toLocaleDateString("es-MX")}</td>
-                  </tr>
-                ))}
-                {stats.recentCerts.length === 0 && (
-                  <tr><td colSpan={3} className="py-4 text-center text-gray-400 text-xs">Sin certificados aún</td></tr>
-                )}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+              ))}
+              {stats.recentCerts.length === 0 && (
+                <tr><td colSpan={3} className="text-center text-[#6B7280] text-xs py-6">Sin certificados aún</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -1,242 +1,253 @@
 # Pasitos Platform
 
-Plataforma web de certificación digital para Pasitos Education & Health A.C. Permite gestionar estudiantes, cursos, inscripciones y emitir certificados digitales con firma criptográfica verificable públicamente via QR.
-
----
-
-## Arquitectura del sistema
-
-```
-Next.js 14 (App Router, TypeScript)
-├── /app/(auth)           → Login público
-├── /app/(dashboard)      → Paneles por rol (Admin / Instructor / Student)
-├── /app/api              → REST API protegida por roles
-├── /app/verify           → Verificación pública de certificados (sin login)
-└── /public/certificates  → PDFs generados
-
-PostgreSQL + Prisma ORM
-├── User                  → Cuentas del sistema (Admin, Instructor, Student)
-├── StudentProfile        → Datos del participante (CURP cifrada AES-256-GCM)
-├── Course                → Catálogo de cursos (C-001, C-002, C-003)
-├── Enrollment            → Inscripción participante ↔ curso
-├── Certificate           → Certificado con firma digital HMAC-SHA256
-└── AuditLog              → Registro de todas las acciones del sistema
-```
-
-**Seguridad:**
-- Autenticación: NextAuth.js v5, JWT, bcrypt para contraseñas
-- Cifrado de datos sensibles: AES-256-GCM (CURP)
-- Firma de certificados: HMAC-SHA256
-- Rate limiting en-memoria: login (5/15 min por IP), verificación (100/hr por IP)
-- Headers de seguridad: X-Frame-Options, CSP, nosniff, Referrer-Policy
+Sistema de gestión de cursos y certificados digitales para Pasitos Education & Health A.C.
 
 ---
 
 ## Requisitos previos
 
-- Node.js 20+
-- PostgreSQL 16+
-- npm 10+
+- **Docker Desktop** — para correr la base de datos PostgreSQL
+- **Node.js 20+**
+- **pnpm** — gestor de paquetes del proyecto
+
+> **Importante:** este proyecto usa `pnpm`. NO uses `npm` ni `npx` para correr comandos de este proyecto o Prisma.
+
+Instalar pnpm si no lo tienes:
+```powershell
+npm install -g pnpm
+```
 
 ---
 
-## Instalación paso a paso
+## Cómo correr el proyecto en desarrollo
 
-```bash
-# 1. Entrar al proyecto
-cd pasitos-platform
+### 1. Iniciar la base de datos con Docker
 
-# 2. Instalar dependencias
-npm install
+El proyecto usa Docker **solo para la base de datos** PostgreSQL. El resto (Next.js) corre localmente con `pnpm dev`.
 
-# 3. Copiar variables de entorno
-cp .env.example .env
-
-# 4. Editar .env con tus valores reales
-
-# 5. Iniciar el Prisma local dev server en una terminal separada
-npx prisma dev
-
-# 6. En otra terminal, sincronizar el schema con la BD
-npx prisma db push
-
-# 7. Poblar con datos iniciales
-npx prisma db seed
-
-# 8. Iniciar el servidor de desarrollo
-npm run dev
+```powershell
+# Desde dentro de pasitos-platform/
+docker-compose up db -d
 ```
+
+Esto levanta:
+- **PostgreSQL** en `localhost:5432`
+- **Adminer** (UI visual de la BD) en `localhost:8080`
+
+También puedes simplemente abrir Docker Desktop y asegurarte de que el contenedor `pasitos-platform-db-1` esté en estado **Running**.
+
+### 2. Instalar dependencias (solo primera vez o al cambiar packages)
+
+```powershell
+pnpm install
+```
+
+### 3. Sincronizar el esquema de base de datos
+
+**Primera vez**, o cada vez que se modifica `prisma/schema.prisma`:
+
+```powershell
+pnpm prisma db push
+```
+
+Esto crea o actualiza las tablas en la BD **y** regenera el cliente de Prisma automáticamente.
+
+### 4. Poblar la BD con datos de prueba (solo primera vez)
+
+```powershell
+pnpm prisma db seed
+```
+
+### 5. Iniciar el servidor de desarrollo
+
+```powershell
+pnpm dev
+```
+
+La app queda disponible en `http://localhost:3000`.
 
 ---
 
 ## Variables de entorno
 
-| Variable | Descripción |
-|---|---|
-| `DATABASE_URL` | URL del Prisma local proxy (`prisma+postgres://...`) |
-| `DIRECT_DATABASE_URL` | Conexión directa a PostgreSQL (`postgresql://user:pass@host/db`) |
-| `NEXTAUTH_SECRET` | Clave aleatoria para JWT (mínimo 32 caracteres) |
-| `NEXTAUTH_URL` | URL base de la app (ej: `http://localhost:3000`) |
-| `CERTIFICATE_SIGNING_KEY` | Clave secreta para firma HMAC-SHA256 de certificados |
-| `ENCRYPTION_KEY` | Clave hex 64 chars (256 bits) para cifrado AES-256-GCM |
-| `NEXT_PUBLIC_BASE_URL` | URL pública de la app (se incluye en QR de certificados) |
-| `SMTP_HOST` | Servidor SMTP para envío de emails |
-| `SMTP_PORT` | Puerto SMTP (ej: 587) |
-| `SMTP_USER` | Usuario SMTP |
-| `SMTP_PASSWORD` | Contraseña SMTP |
+El archivo `.env` ya está configurado para desarrollo local. No necesitas cambiarlo para correr el proyecto.
 
-Para generar claves seguras:
-```bash
-# NEXTAUTH_SECRET
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```env
+DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/pasitos?sslmode=disable"
+DIRECT_DATABASE_URL="postgresql://postgres:postgres@127.0.0.1:5432/pasitos?sslmode=disable"
 
-# CERTIFICATE_SIGNING_KEY
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+NEXTAUTH_SECRET=dev-secret-change-in-production
+NEXTAUTH_URL=http://localhost:3000
 
-# ENCRYPTION_KEY (debe ser exactamente 64 chars hex = 32 bytes)
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+CERTIFICATE_SIGNING_KEY=dev-signing-key-change-in-production-use-generate-keys-script
+ENCRYPTION_KEY=0000000000000000000000000000000000000000000000000000000000000000
+
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+```
+
+> Para producción, genera claves seguras para `NEXTAUTH_SECRET`, `CERTIFICATE_SIGNING_KEY` y `ENCRYPTION_KEY`.
+
+---
+
+## Usuarios de prueba (después del seed)
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Admin | `admin@pasitos.org` | `Admin2025!` |
+| Instructor | `instructor@pasitos.org` | `Instructor2025!` |
+| Estudiante | `estudiante1@example.com` | `Estudiante2025!` |
+
+---
+
+## Comandos Prisma
+
+Todos los comandos de Prisma se corren con `pnpm`, no con `npx`:
+
+```powershell
+# Sincronizar schema con la BD y regenerar cliente (el más usado)
+pnpm prisma db push
+
+# Solo regenerar el cliente sin tocar la BD
+pnpm prisma generate
+
+# Abrir Prisma Studio (UI visual de la BD en el navegador)
+pnpm prisma studio
+
+# Correr el seed
+pnpm prisma db seed
 ```
 
 ---
 
-## Cómo correr en desarrollo
+## Solución de problemas frecuentes
 
-```bash
-# Terminal 1 — Prisma dev server (requerido)
-npx prisma dev
+### Error: `Cannot find module '.prisma/client/default'`
 
-# Terminal 2 — Next.js
-npm run dev
+El cliente de Prisma fue eliminado o no se generó. Solución:
+
+```powershell
+Remove-Item -Recurse -Force node_modules\.prisma\client
+pnpm prisma db push
 ```
 
-Accesos por defecto (después del seed):
-- Admin: `admin@pasitos.org` / `Admin2025!`
-- Instructor: `instructor@pasitos.org` / `Instructor2025!`
+Después reinicia el servidor (`Ctrl+C` y `pnpm dev`).
+
+### Error: `Unknown argument 'modality'` (o cualquier campo desconocido en Prisma)
+
+El cliente generado no coincide con el schema actual. Solución:
+
+```powershell
+pnpm prisma generate
+```
+
+Reinicia el servidor después. Si persiste, usa la solución de arriba (borrar y regenerar).
+
+### Error P1001: `Can't reach database server at 127.0.0.1:5432`
+
+Docker Desktop no está corriendo o el contenedor de la BD está detenido.
+
+1. Abrir Docker Desktop
+2. Verificar que el contenedor PostgreSQL esté en estado **Running**
+3. O correr: `docker-compose up db -d`
+
+### Error al hacer seed: `Table does not exist`
+
+Las tablas aún no han sido creadas en la BD. Correr primero:
+
+```powershell
+pnpm prisma db push
+pnpm prisma db seed
+```
+
+### Cambios en el código no se reflejan / errores raros después de modificar schema
+
+El servidor de Next.js cacha el cliente de Prisma. Siempre reiniciar `pnpm dev` después de cualquier `prisma db push` o `prisma generate`.
 
 ---
 
-## Deploy en Railway / Vercel
-
-### Railway (recomendado — incluye PostgreSQL)
-
-1. Crear proyecto en Railway
-2. Agregar servicio PostgreSQL → copiar `DATABASE_URL`
-3. Agregar las variables de entorno en el panel de Railway
-4. Conectar repositorio → Railway detecta Next.js automáticamente
-5. Ejecutar el seed en la consola de Railway: `npx prisma db seed`
-
-### Vercel + Supabase
-
-1. Crear proyecto en Supabase → copiar connection string
-2. Importar repositorio en Vercel
-3. Agregar todas las variables de entorno en Vercel
-4. En build command: `npx prisma generate && next build`
-
----
-
-## Cómo funciona la firma digital de certificados
-
-### Para técnicos
-
-Cada certificado genera un **payload firmado**:
-
-```json
-{
-  "certificateNumber": "PAC-2025-0001",
-  "studentName": "Juan Pérez",
-  "curp": "PERJ900101HDFRZN01",
-  "courseName": "Puericultura",
-  "score": "9.5",
-  "issueDate": "2025-06-01T00:00:00.000Z",
-  "organizationId": "PASITOS-AC"
-}
-```
-
-Este payload se firma con HMAC-SHA256 usando la `CERTIFICATE_SIGNING_KEY`:
+## Estructura del proyecto
 
 ```
-digitalSignature = HMAC-SHA256(JSON.stringify(payload), CERTIFICATE_SIGNING_KEY)
-```
-
-La firma y el payload se guardan en la BD. Al verificar el certificado, el sistema:
-
-1. Recupera el certificado de la BD por su folio
-2. Re-calcula la firma con el payload guardado
-3. Compara con la firma almacenada usando **comparación de tiempo constante** (evita timing attacks)
-4. Si coinciden → auténtico. Si no → alterado o inválido.
-
-### Para no técnicos
-
-Cuando Pasitos emite un certificado, el sistema crea una "huella digital matemática" usando una clave secreta que solo Pasitos conoce. Al escanear el QR, el sistema recalcula esa huella y la compara con la guardada. Si coincide → auténtico y sin modificaciones. Si alguien intentó cambiar cualquier dato, la huella ya no coincide.
-
----
-
-## Cómo verificar manualmente un certificado
-
-```bash
-# Usando curl
-curl https://tu-dominio.com/api/certificates/VER-XXXXXXXX/verify
-
-# O visitar en el navegador:
-https://tu-dominio.com/verify/VER-XXXXXXXX
+pasitos-platform/
+├── app/
+│   ├── (auth)/login/              # Página de inicio de sesión
+│   ├── (dashboard)/
+│   │   ├── admin/                 # Panel de administrador
+│   │   ├── instructor/            # Panel de instructor
+│   │   └── student/               # Panel de estudiante
+│   ├── api/                       # API Routes (Next.js App Router)
+│   └── verify/                    # Verificación pública de certificados (sin login)
+├── components/
+│   ├── dashboard/sidebar.tsx      # Barra lateral del dashboard
+│   ├── emit-cert-form.tsx         # Formulario de emisión de certificados
+│   └── instructor/                # Componentes del panel de instructor
+├── lib/
+│   ├── certificates/
+│   │   ├── template.ts            # Generación del PDF con pdf-lib (coordenadas y layout)
+│   │   ├── pdf-generator.ts       # Punto de entrada para generar el PDF
+│   │   └── signer.ts              # Firma digital y emisión del certificado en BD
+│   ├── crypto.ts                  # Cifrado AES-256-GCM y firma HMAC-SHA256
+│   └── db.ts                      # Cliente de Prisma (singleton)
+├── prisma/
+│   ├── schema.prisma              # Esquema de la base de datos
+│   └── seed.ts                    # Datos de prueba
+├── public/
+│   └── templates/
+│       ├── h1.png                 # Plantilla página 1 del certificado (1280×853px)
+│       └── h2.png                 # Plantilla página 2 / boleta (1280×853px)
+├── docker-compose.yml             # Solo el servicio `db` se usa en desarrollo
+└── .env                           # Variables de entorno (ya configurado para desarrollo)
 ```
 
 ---
 
-## Cómo hacer backup de la CERTIFICATE_SIGNING_KEY
+## Rutas principales de la app
 
-**CRÍTICO:** Esta clave es la base de toda la verificación del sistema.
-
-1. Guardar en un **gestor de contraseñas** (Bitwarden, 1Password, KeePass)
-2. Guardar una copia cifrada offline (pendrive en lugar seguro)
-3. Nunca incluirla en repositorios de código
-
-### ¿Qué pasa si se pierde la signing key?
-
-Los certificados ya emitidos **no podrán verificarse automáticamente** — la verificación retornará "inválido". Los PDFs físicos siguen siendo válidos como documentos. Con los datos originales en BD, se pueden re-firmar todos los certificados con una nueva clave.
-
-### ¿Qué pasa si la signing key se compromete?
-
-1. Generar una nueva clave inmediatamente y actualizar la variable de entorno
-2. Reiniciar la app en producción
-3. Re-firmar todos los certificados existentes con la nueva clave
+| Ruta | Descripción | Acceso |
+|---|---|---|
+| `/login` | Inicio de sesión | Público |
+| `/verify` | Verificar certificado por folio o número | Público |
+| `/admin` | Dashboard de administrador | Admin |
+| `/admin/students` | Lista de estudiantes | Admin |
+| `/admin/certificates` | Lista de certificados emitidos | Admin |
+| `/instructor` | Dashboard de instructor | Instructor |
+| `/instructor/students` | Lista de alumnos y sus inscripciones | Instructor |
+| `/instructor/enroll` | Registrar nuevo alumno e inscripción | Instructor |
+| `/api/certificates/preview` | Preview del PDF generado (solo desarrollo) | Admin |
 
 ---
 
-## ¿Qué garantiza el sistema?
+## Cómo funciona el certificado digital
 
-| Garantía | Cómo se implementa |
-|---|---|
-| **Integridad** | Si cualquier campo del certificado es alterado en la BD, la firma HMAC no coincide |
-| **Autenticidad** | Solo quien tiene la `CERTIFICATE_SIGNING_KEY` puede generar firmas válidas |
-| **Trazabilidad** | Toda acción queda registrada en el AuditLog con usuario, IP y timestamp |
-| **QR verificable** | El QR apunta siempre a `/verify/{folio}` en el servidor oficial de Pasitos |
-
-Lo que el sistema **no garantiza:**
-- No es firma de persona física (no usa e.firma SAT)
-- No es firma notarial ni tiene valor probatorio legal formal
-- Es equivalente a un sello de seguridad de organización
+1. El instructor o admin llena el formulario de emisión (modalidad, módulos evaluados, observaciones)
+2. El sistema guarda los módulos en `EnrollmentModule` y la modalidad en `Enrollment`
+3. Se genera un payload JSON con los datos del certificado y se firma con HMAC-SHA256
+4. Se genera el PDF de dos páginas usando las plantillas PNG (`h1.png`, `h2.png`) con pdf-lib
+5. El QR del certificado apunta a `/verify/{folio}` donde cualquier persona puede verificar su autenticidad
 
 ---
 
-## Cómo personalizar la plantilla del certificado PDF
+## Backup de la base de datos
 
-El PDF se genera en `lib/certificates/pdf-generator.ts`. Para ajustar el diseño, modifica ese archivo y prueba en:
-
-```
-GET /api/certificates/preview  (solo en desarrollo o para ADMIN)
-```
-
-Para agregar el logo de Pasitos: colocar `public/logo-pasitos.png` y será incluido automáticamente.
-
----
-
-## Backup y restore de la base de datos
-
-```bash
+```powershell
 # Backup
-pg_dump $DIRECT_DATABASE_URL | gzip > backup-$(date +%Y%m%d).sql.gz
+pg_dump "postgresql://postgres:postgres@127.0.0.1:5432/pasitos" | gzip > backup-$(date +%Y%m%d).sql.gz
 
 # Restore
-gunzip -c backup-20250601.sql.gz | psql $DIRECT_DATABASE_URL
+gunzip -c backup-20250601.sql.gz | psql "postgresql://postgres:postgres@127.0.0.1:5432/pasitos"
+```
+
+---
+
+## Seguridad importante para producción
+
+- Cambiar **todas** las claves en `.env` antes de hacer deploy
+- `CERTIFICATE_SIGNING_KEY` es crítica — si se pierde, los certificados ya emitidos no podrán verificarse. Guardarla en un gestor de contraseñas
+- `ENCRYPTION_KEY` debe ser exactamente 64 caracteres hexadecimales (32 bytes)
+
+Generar claves seguras:
+```powershell
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # NEXTAUTH_SECRET
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"   # CERTIFICATE_SIGNING_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # ENCRYPTION_KEY
 ```

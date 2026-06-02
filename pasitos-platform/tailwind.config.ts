@@ -30,26 +30,16 @@ const config: Config = {
           DEFAULT: "var(--accent)",
           foreground: "var(--accent-foreground)",
         },
-        destructive: {
-          DEFAULT: "var(--destructive)",
-        },
-        card: {
-          DEFAULT: "var(--card)",
-          foreground: "var(--card-foreground)",
-        },
-        popover: {
-          DEFAULT: "var(--popover)",
-          foreground: "var(--popover-foreground)",
-        },
-        sidebar: {
-          DEFAULT: "var(--sidebar)",
-          foreground: "var(--sidebar-foreground)",
-          primary: "var(--sidebar-primary)",
-          "primary-foreground": "var(--sidebar-primary-foreground)",
-          accent: "var(--sidebar-accent)",
-          "accent-foreground": "var(--sidebar-accent-foreground)",
-          border: "var(--sidebar-border)",
-          ring: "var(--sidebar-ring)",
+        destructive: { DEFAULT: "var(--destructive)" },
+        card: { DEFAULT: "var(--card)", foreground: "var(--card-foreground)" },
+        pasitos: {
+          purple:         "#7C3AED",
+          "purple-dark":  "#6B21A8",
+          "purple-light": "#EDE9FE",
+          "purple-mid":   "#A855F7",
+          "gray-light":   "#F9F7FF",
+          border:         "#E9D5FF",
+          green:          "#15803D",
         },
       },
       borderRadius: {
@@ -59,6 +49,11 @@ const config: Config = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+      },
+      boxShadow: {
+        pasitos:       "0 1px 3px rgba(124, 58, 237, 0.08)",
+        "pasitos-md":  "0 4px 12px rgba(124, 58, 237, 0.15)",
+        "pasitos-btn": "0 2px 8px rgba(124, 58, 237, 0.30)",
       },
     },
   },
