@@ -118,6 +118,8 @@ model Certificate {
   verificationFolio  String    @unique
   digitalSignature   String
   signaturePayload   String
+  rsaSignature       String?
+  cadenaOriginal     String?
   pdfPath            String?
   isRevoked          Boolean   @default(false)
   revokedAt          DateTime?

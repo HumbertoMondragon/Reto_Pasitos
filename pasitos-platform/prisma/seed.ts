@@ -1,6 +1,7 @@
 import { PrismaClient, Role, EducationLevel, EnrollmentResult } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import bcrypt from "bcryptjs";
+import { encryptField } from "../lib/crypto";
 
 const adapter = new PrismaPg({ connectionString: process.env.DIRECT_DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -131,13 +132,14 @@ async function main() {
       },
     });
 
+    const encryptedCurp = encryptField(sd.curp.toUpperCase());
     const profile = await prisma.studentProfile.upsert({
-      where: { curp: sd.curp },
-      update: {},
+      where: { userId: studentUser.id },
+      update: { curp: encryptedCurp },
       create: {
         userId: studentUser.id,
         fullName: sd.name,
-        curp: sd.curp,
+        curp: encryptedCurp,
         birthDate: sd.birthDate,
         educationLevel: sd.educationLevel,
         email: sd.email,

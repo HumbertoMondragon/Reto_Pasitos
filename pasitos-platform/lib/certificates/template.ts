@@ -28,6 +28,8 @@ export interface CertificateTemplateData {
   verificationFolio: string;
   verifyUrl: string;
   digitalSignatureHash: string;
+  rsaSignature?: string;
+  cadenaOriginal?: string;
   modality?: string;
   observations?: string;
   modules?: Array<{
@@ -71,6 +73,12 @@ function truncate(text: string, font: PDFFont, size: number, maxW: number): stri
   let s = text;
   while (s.length > 0 && font.widthOfTextAtSize(s + "…", size) > maxW) s = s.slice(0, -1);
   return s + "…";
+}
+
+function splitAt(str: string, n: number): string[] {
+  const chunks: string[] = [];
+  for (let i = 0; i < str.length; i += n) chunks.push(str.slice(i, i + n));
+  return chunks;
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxW: number): string[] {
@@ -210,6 +218,41 @@ async function buildPage2(
     const qrImg = await makeQr(doc, data.verifyUrl);
     page.drawImage(qrImg, { x: 1092, y: PH - 644 - 76, width: 76, height: 76 });
   } catch { /* non-fatal */ }
+
+  // ── Sello Digital RSA (estilo SAT) ────────────────────────────────────────
+  if (data.rsaSignature && data.cadenaOriginal) {
+    const sepCanvasY = 756;   // 728 + 28 (1 cm abajo)
+    const xBase     = 68;    // 40  + 28 (1 cm a la derecha)
+    const xContent  = 78;    // 50  + 28
+
+    page.drawLine({
+      start: { x: xBase, y: PH - sepCanvasY },
+      end:   { x: PW - 40, y: PH - sepCanvasY },
+      thickness: 0.4,
+      color: C.gray_mid,
+    });
+
+    const sz = 7.5;
+    const lh = 10;
+    let cy = sepCanvasY + 9;
+
+    dt(page, "Sello Digital — Pasitos Education & Health A.C.", bold, 8, xBase, cy, C.gray_mid);
+    cy += lh + 1;
+
+    dt(page, "Cadena original:", bold, sz, xBase, cy, C.gray_mid);
+    cy += lh;
+    for (const chunk of splitAt(data.cadenaOriginal, 175)) {
+      dt(page, chunk, regular, sz, xContent, cy, C.gray_mid);
+      cy += lh;
+    }
+
+    dt(page, "Sello digital (RSA-SHA256):", bold, sz, xBase, cy, C.gray_mid);
+    cy += lh;
+    for (const chunk of splitAt(data.rsaSignature, 175)) {
+      dt(page, chunk, regular, sz, xContent, cy, C.gray_mid);
+      cy += lh;
+    }
+  }
 }
 
 export async function buildCertificatePDF(data: CertificateTemplateData): Promise<Uint8Array> {

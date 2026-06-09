@@ -1,4 +1,4 @@
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from "crypto";
+import { createCipheriv, createDecipheriv, createHmac, createSign, createVerify, randomBytes } from "crypto";
 import { prisma } from "@/lib/db";
 
 const ALGORITHM = "aes-256-gcm";
@@ -58,6 +58,50 @@ export function verifyCertificate(payload: object, signature: string): boolean {
       diff |= expected.charCodeAt(i) ^ signature.charCodeAt(i);
     }
     return diff === 0;
+  } catch {
+    return false;
+  }
+}
+
+// ── RSA-SHA256 (sello digital SAT-style) ─────────────────────────────────────
+
+export interface CadenaOriginalPayload {
+  certificateNumber: string;
+  studentName: string;
+  curp: string;
+  courseName: string;
+  score: string;
+  issueDate: string;
+  organizationId: string;
+}
+
+export function buildCadenaOriginal(p: CadenaOriginalPayload): string {
+  return `||${p.certificateNumber}|${p.studentName}|${p.curp}|${p.courseName}|${p.score}|${p.issueDate}|${p.organizationId}||`;
+}
+
+function getRsaPrivateKey(): string {
+  const raw = process.env.RSA_PRIVATE_KEY;
+  if (!raw) throw new Error("RSA_PRIVATE_KEY is not set");
+  return raw.replace(/\\n/g, "\n");
+}
+
+function getRsaPublicKey(): string {
+  const raw = process.env.RSA_PUBLIC_KEY;
+  if (!raw) throw new Error("RSA_PUBLIC_KEY is not set");
+  return raw.replace(/\\n/g, "\n");
+}
+
+export function signCertificateRSA(cadenaOriginal: string): string {
+  const sign = createSign("RSA-SHA256");
+  sign.update(cadenaOriginal, "utf8");
+  return sign.sign(getRsaPrivateKey(), "base64");
+}
+
+export function verifyCertificateRSA(cadenaOriginal: string, signature: string): boolean {
+  try {
+    const verify = createVerify("RSA-SHA256");
+    verify.update(cadenaOriginal, "utf8");
+    return verify.verify(getRsaPublicKey(), signature, "base64");
   } catch {
     return false;
   }

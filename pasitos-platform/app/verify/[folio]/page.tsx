@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyCertificate } from "@/lib/crypto";
+import { verifyCertificate, verifyCertificateRSA } from "@/lib/crypto";
 import { CheckCircle2, XCircle, AlertTriangle, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
@@ -32,6 +32,11 @@ export default async function VerifyFolioPage({ params }: Props) {
   const isValid = verifyCertificate(signaturePayload, certificate.digitalSignature);
   if (!isValid) return <InvalidPage folio={folio} reason="invalid_signature" />;
 
+  const rsaValid =
+    certificate.rsaSignature && certificate.cadenaOriginal
+      ? verifyCertificateRSA(certificate.cadenaOriginal, certificate.rsaSignature)
+      : null;
+
   if (certificate.isRevoked) {
     return (
       <RevokedPage
@@ -53,13 +58,16 @@ export default async function VerifyFolioPage({ params }: Props) {
       courseHours={certificate.enrollment.course.durationHours}
       issueDate={certificate.issueDate}
       signaturePreview={certificate.digitalSignature.slice(0, 32)}
+      rsaValid={rsaValid}
+      rsaSignaturePreview={certificate.rsaSignature?.slice(0, 32) ?? null}
     />
   );
 }
 
-function ValidPage({ certificateNumber, verificationFolio, studentName, courseName, courseHours, issueDate, signaturePreview }: {
+function ValidPage({ certificateNumber, verificationFolio, studentName, courseName, courseHours, issueDate, signaturePreview, rsaValid, rsaSignaturePreview }: {
   certificateNumber: string; verificationFolio: string; studentName: string;
   courseName: string; courseHours: number; issueDate: Date; signaturePreview: string;
+  rsaValid: boolean | null; rsaSignaturePreview: string | null;
 }) {
   return (
     <PageShell bg="bg-[#F0FDF4]">
@@ -86,10 +94,17 @@ function ValidPage({ certificateNumber, verificationFolio, studentName, courseNa
           <Row label="Folio"            value={verificationFolio} mono />
         </div>
 
-        <div className="bg-[#F9F7FF] rounded-lg border border-[#E9D5FF] px-4 py-3 mb-5">
+        <div className="bg-[#F9F7FF] rounded-lg border border-[#E9D5FF] px-4 py-3 mb-3 space-y-2">
           <p className="text-xs text-[#6B7280] font-mono break-all">
-            <span className="font-semibold not-mono">Firma digital: </span>{signaturePreview}…
+            <span className="font-semibold not-mono">HMAC-SHA256: </span>{signaturePreview}…
           </p>
+          {rsaSignaturePreview && (
+            <p className="text-xs text-[#6B7280] font-mono break-all">
+              <span className="font-semibold not-mono">Sello digital RSA: </span>{rsaSignaturePreview}…
+              {rsaValid === true && <span className="ml-2 text-[#15803D] font-semibold not-mono">✓ verificado</span>}
+              {rsaValid === false && <span className="ml-2 text-red-600 font-semibold not-mono">✗ inválido</span>}
+            </p>
+          )}
         </div>
 
         <div className="text-center">

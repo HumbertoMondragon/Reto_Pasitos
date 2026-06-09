@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { verifyCertificate } from "@/lib/crypto";
+import { verifyCertificate, verifyCertificateRSA } from "@/lib/crypto";
 import { NextResponse } from "next/server";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { getClientIp } from "@/lib/audit/logger";
@@ -52,8 +52,14 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
 
   const isValid = verifyCertificate(signaturePayload, certificate.digitalSignature);
 
+  let rsaValid: boolean | null = null;
+  if (certificate.rsaSignature && certificate.cadenaOriginal) {
+    rsaValid = verifyCertificateRSA(certificate.cadenaOriginal, certificate.rsaSignature);
+  }
+
   return NextResponse.json({
     isValid,
+    rsaValid,
     isRevoked: certificate.isRevoked,
     revokedAt: certificate.revokedAt,
     revokedReason: certificate.revokedReason,
@@ -65,5 +71,6 @@ export async function GET(req: Request, { params }: { params: { id: string } }) 
     courseCode: certificate.enrollment.course.courseCode,
     courseHours: certificate.enrollment.course.durationHours,
     digitalSignaturePreview: certificate.digitalSignature.slice(0, 32),
+    rsaSignaturePreview: certificate.rsaSignature?.slice(0, 32) ?? null,
   });
 }

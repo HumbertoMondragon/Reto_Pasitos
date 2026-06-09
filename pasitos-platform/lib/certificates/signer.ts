@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { decryptField, generateCertificateNumber, generateVerificationFolio, signCertificate } from "@/lib/crypto";
+import { buildCadenaOriginal, decryptField, generateCertificateNumber, generateVerificationFolio, signCertificate, signCertificateRSA } from "@/lib/crypto";
 import { generateCertificatePDF } from "./pdf-generator";
 import { logAction } from "@/lib/api/helpers";
 import { sendEmail } from "@/lib/email/sender";
@@ -57,6 +57,23 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
 
   const digitalSignature = signCertificate(signaturePayload);
 
+  const cadenaOriginal = buildCadenaOriginal({
+    certificateNumber,
+    studentName: enrollment.studentProfile.fullName,
+    curp,
+    courseName: enrollment.course.name,
+    score: calculatedScore.toFixed(1),
+    issueDate: issueDate.toISOString(),
+    organizationId: "PASITOS-AC",
+  });
+
+  let rsaSignature: string | null = null;
+  try {
+    rsaSignature = signCertificateRSA(cadenaOriginal);
+  } catch {
+    // RSA key not configured — certificate still issues without it
+  }
+
   const certificate = await prisma.certificate.create({
     data: {
       enrollmentId,
@@ -65,6 +82,8 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
       issueDate,
       digitalSignature,
       signaturePayload: JSON.stringify(signaturePayload),
+      rsaSignature,
+      cadenaOriginal,
     },
   });
 
@@ -84,6 +103,8 @@ export async function issueCertificate(enrollmentId: string, issuedByUserId: str
       verificationFolio,
       verifyUrl,
       digitalSignatureHash: digitalSignature,
+      rsaSignature: rsaSignature ?? undefined,
+      cadenaOriginal,
       modality: enrollment.modality ?? undefined,
       observations: enrollment.observations ?? undefined,
       modules: enrollment.modules.map((m) => ({

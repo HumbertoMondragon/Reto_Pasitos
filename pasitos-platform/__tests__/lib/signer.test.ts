@@ -1,7 +1,7 @@
 // Mock all external dependencies before any imports
 jest.mock("@/lib/db", () => ({
   prisma: {
-    enrollment: { findUnique: jest.fn() },
+    enrollment: { findUnique: jest.fn(), update: jest.fn() },
     certificate: { create: jest.fn(), update: jest.fn(), count: jest.fn() },
   },
 }));
@@ -40,7 +40,9 @@ const mockEnrollmentBase = {
   observations: null,
   createdAt: new Date(),
   updatedAt: new Date(),
+  modality: null,
   certificate: null,
+  modules: [],
   studentProfile: {
     id: "profile-1",
     userId: "user-1",
@@ -75,6 +77,8 @@ jest.mock("@/lib/crypto", () => ({
   decryptField: jest.fn().mockReturnValue("GARA900101MDFRCN01"),
   generateCertificateNumber: jest.fn().mockResolvedValue("PAC-2025-0001"),
   generateVerificationFolio: jest.fn().mockReturnValue("VER-ABCD1234"),
+  buildCadenaOriginal: jest.fn().mockReturnValue("||PAC-2025-0001|Ana García|GARA...|Puericultura|9.5|2025-01-01|PASITOS-AC||"),
+  signCertificateRSA: jest.fn().mockReturnValue("mock-rsa-signature"),
 }));
 
 describe("issueCertificate", () => {
@@ -95,6 +99,7 @@ describe("issueCertificate", () => {
       createdAt: new Date(),
     });
     (mockPrisma.certificate.update as jest.Mock).mockResolvedValue({});
+    (mockPrisma.enrollment.update as jest.Mock).mockResolvedValue({});
   });
 
   test("lanza error si la inscripción no existe", async () => {
@@ -102,14 +107,14 @@ describe("issueCertificate", () => {
     await expect(issueCertificate("nonexistent", "user-1")).rejects.toThrow("Inscripción no encontrada");
   });
 
-  test("lanza error si el resultado no es PASSED", async () => {
+  test("emite certificado aunque el resultado sea FAILED (sin módulos)", async () => {
     (mockPrisma.enrollment.findUnique as jest.Mock).mockResolvedValue({
       ...mockEnrollmentBase,
       result: EnrollmentResult.FAILED,
     });
-    await expect(issueCertificate("enrollment-1", "user-1")).rejects.toThrow(
-      "no ha aprobado"
-    );
+    (mockPrisma.enrollment.update as jest.Mock).mockResolvedValue({});
+    const result = await issueCertificate("enrollment-1", "user-1");
+    expect(result.certificateNumber).toBeDefined();
   });
 
   test("lanza error si ya existe un certificado para la inscripción", async () => {
