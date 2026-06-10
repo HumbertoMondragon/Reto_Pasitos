@@ -1,22 +1,63 @@
 # Pasitos Platform
+### Sistema de Gestión de Cursos y Certificados Digitales
 
-Sistema de gestión de cursos y certificados digitales con firma RSA para **Pasitos Education & Health A.C.**
-
-Cada certificado emitido lleva un **sello digital RSA-2048** impreso en el PDF — el mismo mecanismo criptográfico que utiliza el SAT de México en sus Comprobantes Fiscales Digitales (CFDI) — que garantiza autenticidad e integridad verificables públicamente sin intermediarios.
+Plataforma web desarrollada a medida para **Pasitos Education & Health A.C.** que digitaliza y automatiza el ciclo completo de formación: registro de alumnos, inscripciones por módulos, emisión de certificados y verificación pública de autenticidad.
 
 ---
 
-## Características principales
+## El diferenciador: sello digital igual al del SAT
 
-- **Firma digital RSA-2048** impresa en cada certificado (cadena original + sello digital, estilo SAT/CFDI)
-- **Verificación pública por QR** — cualquier persona confirma autenticidad en segundos sin cuenta ni registro
-- **Cifrado AES-256-GCM** de datos personales sensibles (CURP) en la base de datos
-- **HMAC-SHA256** de integridad interna con comparación en tiempo constante
-- **3 roles**: Administrador, Instructor, Alumno
-- **Importación masiva** desde Excel
-- **Envío automático** de certificados PDF por correo
-- **Registro de auditoría** completo (quién, qué, cuándo, desde qué IP)
-- **Rate limiting** en endpoints críticos (login y verificación pública)
+Cada certificado lleva impreso un **sello digital RSA-2048** — el mismo mecanismo criptográfico que usa el SAT de México en sus Comprobantes Fiscales Digitales (CFDI). Esto significa que cualquier empleador o institución puede escanear el QR del certificado y verificar en segundos que es auténtico, sin llamar a Pasitos, sin correos, sin intermediarios.
+
+```
+──────────────────────────────────────────────────────────────────────
+Sello Digital — Pasitos Education & Health A.C.
+Cadena original: ||PAC-2026-0001|María González|GOLM...|Puericultura|9.5|...|PASITOS-AC||
+Sello digital (RSA-SHA256): U76AueeDipyIbFRWgaBDvjch2bkSwZq...ko08w==
+```
+
+Si alguien altera el nombre, la calificación o cualquier dato del certificado, el sello deja de ser válido automáticamente.
+
+---
+
+## ¿Qué resuelve?
+
+| Antes | Con Pasitos Platform |
+|---|---|
+| Certificados en papel, falsificables | Sello digital RSA impreso en el PDF |
+| Verificación por llamada o correo | Verificación pública instantánea por QR |
+| Expedientes en Excel | Base de datos centralizada y cifrada |
+| Envío manual de documentos | Entrega automática al correo del alumno |
+| Sin trazabilidad | Auditoría completa de cada acción |
+| CURP en texto plano | CURP cifrada con AES-256-GCM |
+| 30–60 min por certificado | 2–3 min por certificado |
+
+---
+
+## Funcionalidades
+
+- **Emisión de certificados PDF** con sello RSA, QR y boleta de calificaciones por módulo
+- **Portal de verificación pública** — sin cuenta, sin registro, solo el folio o QR
+- **Gestión de alumnos** con importación masiva desde Excel
+- **Inscripciones por módulos** con competencias, calificaciones y evidencias
+- **3 roles**: Administrador · Instructor · Alumno
+- **Revocación de certificados** con motivo registrado
+- **Registro de auditoría** — quién, qué, cuándo, desde qué IP
+- **Rate limiting** — protección contra fuerza bruta y scraping
+
+---
+
+## Seguridad
+
+| Mecanismo | Qué protege |
+|---|---|
+| RSA-2048 | Autenticidad e integridad del certificado (impreso en el PDF) |
+| HMAC-SHA256 | Integridad interna en la base de datos |
+| AES-256-GCM | CURP cifrada en reposo — ilegible sin la clave del servidor |
+| bcrypt (12 rondas) | Contraseñas de usuarios |
+| JWT firmado | Sesiones de usuario — no manipulables |
+| RBAC | Control de acceso por rol en cada endpoint |
+| Headers HTTP | CSP, X-Frame-Options, nosniff, Permissions-Policy |
 
 ---
 
@@ -24,10 +65,10 @@ Cada certificado emitido lleva un **sello digital RSA-2048** impreso en el PDF �
 
 | Capa | Tecnología |
 |---|---|
-| Frontend / Backend | Next.js 14 + React 18 + TypeScript |
+| Framework | Next.js 14 + React 18 + TypeScript |
 | Base de datos | PostgreSQL 16 |
 | ORM | Prisma 7 |
-| Autenticación | NextAuth.js 5 (JWT + RBAC) |
+| Autenticación | NextAuth.js 5 |
 | Criptografía | Node.js `crypto` nativo — RSA-2048, HMAC-SHA256, AES-256-GCM |
 | PDF | pdf-lib |
 | Correo | Nodemailer (SMTP) |
@@ -35,33 +76,17 @@ Cada certificado emitido lleva un **sello digital RSA-2048** impreso en el PDF �
 
 ---
 
-## Inicio rápido (desarrollo)
+## Inicio rápido
 
-### Requisitos
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/)
-- [Node.js 20+](https://nodejs.org/)
-- [pnpm](https://pnpm.io/) — `npm install -g pnpm`
-
-### Pasos
+**Requisitos:** Docker Desktop · Node.js 20+ · pnpm (`npm install -g pnpm`)
 
 ```powershell
-# 1. Levantar la base de datos
-docker-compose up db -d
-
-# 2. Instalar dependencias
-pnpm install
-
-# 3. Crear tablas en la BD
-pnpm prisma db push
-
-# 4. Poblar con datos de prueba
-pnpm prisma db seed
-
-# 5. Iniciar el servidor
-pnpm dev
+docker-compose up db -d      # 1. Base de datos
+pnpm install                 # 2. Dependencias
+pnpm prisma db push          # 3. Crear tablas
+pnpm prisma db seed          # 4. Datos de prueba
+pnpm dev                     # 5. Servidor → http://localhost:3000
 ```
-
-La app queda disponible en `http://localhost:3000`.
 
 ### Usuarios de prueba
 
@@ -73,58 +98,45 @@ La app queda disponible en `http://localhost:3000`.
 
 ---
 
-## Variables de entorno
+## Estructura del proyecto
 
-El archivo `.env` ya está configurado para desarrollo. Para producción, genera claves seguras:
+```
+├── app/
+│   ├── (auth)/login/          # Inicio de sesión
+│   ├── (dashboard)/
+│   │   ├── admin/             # Panel administrador
+│   │   ├── instructor/        # Panel instructor
+│   │   └── student/           # Panel alumno
+│   ├── api/                   # Endpoints REST
+│   └── verify/                # Portal público de verificación (sin login)
+├── components/                # Componentes React reutilizables
+├── lib/
+│   ├── crypto/                # RSA-2048, HMAC-SHA256, AES-256-GCM
+│   ├── certificates/          # Generación de PDF y emisión con firma
+│   ├── email/                 # Plantillas y envío SMTP
+│   ├── audit/                 # Logger de auditoría
+│   └── rate-limit/            # Limitador de intentos por IP
+├── prisma/                    # Schema y seed de la base de datos
+├── scripts/                   # Generación de claves RSA y utilidades
+└── public/templates/          # Plantillas PNG del certificado
+```
+
+---
+
+## Variables de entorno para producción
+
+Copiar `.env.example` a `.env` y generar claves seguras:
 
 ```powershell
-# Claves HMAC y cifrado
-node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"  # CERTIFICATE_SIGNING_KEY
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"  # ENCRYPTION_KEY
+# Cifrado y HMAC
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"   # ENCRYPTION_KEY
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"   # CERTIFICATE_SIGNING_KEY
 
 # Par de claves RSA (sello digital)
 node scripts/generate-rsa-keys.mjs
 ```
 
----
-
-## Estructura del proyecto
-
-```
-├── app/                  # Páginas y API Routes (Next.js App Router)
-│   ├── (auth)/           # Login
-│   ├── (dashboard)/      # Paneles admin / instructor / alumno
-│   ├── api/              # Endpoints REST
-│   └── verify/           # Portal público de verificación
-├── components/           # Componentes React reutilizables
-├── lib/
-│   ├── crypto/           # RSA-2048, HMAC-SHA256, AES-256-GCM
-│   ├── certificates/     # Generación de PDF y emisión con firma
-│   ├── email/            # Plantillas y envío SMTP
-│   ├── audit/            # Logger de auditoría
-│   └── rate-limit/       # Limitador de intentos por IP
-├── prisma/               # Schema y seed de la base de datos
-├── scripts/              # Generación de claves y utilidades
-└── public/templates/     # Plantillas PNG del certificado
-```
-
----
-
-## Cómo funciona el sello digital
-
-```
-Al emitir:
-  1. Se construye la cadena original:
-     ||PAC-2026-0001|Nombre Alumno|CURP|Curso|9.5|2026-06-09T...|PASITOS-AC||
-  2. Se firma con RSA-2048 (clave privada del servidor) → Sello Digital en Base64
-  3. Se imprime al pie del PDF junto con la cadena original
-  4. Se envía al correo del alumno
-
-Al verificar (escanear QR):
-  ✓ Firma válida + no revocado  → Certificado AUTÉNTICO
-  ✗ Firma inválida              → Certificado FALSIFICADO o ALTERADO
-  ✗ Revocado                   → Certificado REVOCADO
-```
+> La `RSA_PRIVATE_KEY` es crítica — guárdala en un gestor de contraseñas. Sin ella, los nuevos certificados no tendrán sello válido.
 
 ---
 
@@ -132,22 +144,22 @@ Al verificar (escanear QR):
 
 ```powershell
 pnpm dev                            # Servidor de desarrollo
-pnpm build                          # Build de producción
+pnpm build && pnpm start            # Build y servidor de producción
 pnpm test                           # Pruebas unitarias
-pnpm test:coverage                  # Cobertura de pruebas
+pnpm test:coverage                  # Cobertura de pruebas (~93% en módulo crítico)
 pnpm prisma studio                  # UI visual de la base de datos
-pnpm prisma db push                 # Sincronizar schema con la BD
-pnpm prisma db seed                 # Poblar con datos de prueba
-node scripts/generate-rsa-keys.mjs  # Generar par de claves RSA
+node scripts/generate-rsa-keys.mjs  # Regenerar par de claves RSA
 ```
 
 ---
 
-## Documentación adicional
+## Documentación
 
-- [`ONBOARDING.md`](./ONBOARDING.md) — Guía de despliegue a producción
-- [`PLATAFORMA_PASITOS.md`](./PLATAFORMA_PASITOS.md) — Descripción ejecutiva completa de la plataforma
+| Archivo | Contenido |
+|---|---|
+| [`PLATAFORMA_PASITOS.md`](./PLATAFORMA_PASITOS.md) | Descripción ejecutiva completa — qué hace, cuánto cuesta, beneficios, seguridad |
+| [`ONBOARDING.md`](./ONBOARDING.md) | Guía paso a paso para despliegue en producción |
 
 ---
 
-*Desarrollado para Pasitos Education & Health A.C.*
+*Desarrollado para Pasitos Education & Health A.C. · Next.js · PostgreSQL · RSA-2048 · AES-256-GCM*
